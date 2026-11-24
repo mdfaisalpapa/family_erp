@@ -2330,7 +2330,7 @@
         } else {
           const frag = data.items.map(tx => {
             const delBtn = CAN_WRITE
-              ? '<button type="button" class="btn btn-danger-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="deleteTransaction('' + escHtml(tx.name) + '')">Cancel</button>'
+              ? '<button type="button" class="btn btn-danger-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" data-vno="' + escHtml(tx.name) + '" onclick="deleteTransaction(this.dataset.vno)">Cancel</button>'
               : '';
             const attBadge = tx.attachments_count > 0 ? ' &bull; ' + tx.attachments_count + ' file(s)' : '';
             return '<div class="tx-card">' +
@@ -2544,7 +2544,7 @@
         const isTodo = meta && meta.is_todo;
         const cls = isTodo ? 'tag-pill tag-pill-todo' : 'tag-pill';
         const rm = CAN_WRITE
-          ? ' <span style="cursor:pointer;margin-left:0.15rem;" onclick="toggleTxTag('' + escHtml(voucherNo) + '','' + escHtml(tag) + '','remove')">&times;</span>'
+          ? ' <span style="cursor:pointer;margin-left:0.15rem;" data-vno="' + escHtml(voucherNo) + '" data-tag="' + escHtml(tag) + '" data-act="remove" onclick="toggleTxTag(this.dataset.vno,this.dataset.tag,this.dataset.act)">&times;</span>'
           : '';
         return '<span class="' + cls + '">' + escHtml(tag) + rm + '</span>';
       }).join('') + '</div>';
@@ -2563,7 +2563,7 @@
           return m && m.is_todo;
         }) || (tx.tags && tx.tags[0]) || '';
         const doneBtn = (CAN_WRITE && todoTag)
-          ? '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.55rem;font-size:0.75rem;" onclick="markTodoDone('' + escHtml(tx.name) + '','' + escHtml(todoTag) + '')">Done</button>'
+          ? '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.55rem;font-size:0.75rem;" data-vno="' + escHtml(tx.name) + '" data-tag="' + escHtml(todoTag) + '" onclick="markTodoDone(this.dataset.vno,this.dataset.tag)">Done</button>'
           : '';
         return '<div class="acct-row">' +
           '<div style="min-width:0;">' +
@@ -2631,7 +2631,7 @@
       const chipsHtml = templatesCache.length
         ? '<span style="font-size:0.75rem;font-weight:700;color:var(--text-muted);">Quick Templates:</span>' +
           templatesCache.map(t =>
-            '<button type="button" class="tpl-chip" onclick="useTemplate('' + escHtml(t.name) + '')">' +
+            '<button type="button" class="tpl-chip" data-tpl="' + escHtml(t.name) + '" onclick="useTemplate(this.dataset.tpl)">' +
               escHtml(t.template_name) + (t.default_amount > 0 ? ' (' + fmtInr(t.default_amount) + ')' : '') +
             '</button>'
           ).join('')
@@ -2651,9 +2651,9 @@
       }
       el.innerHTML = templatesCache.map(t => {
         const actions = CAN_WRITE
-          ? '<button type="button" class="btn btn-primary" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="useTemplate('' + escHtml(t.name) + '')">Use</button>' +
-            '<button type="button" class="btn btn-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="editTemplate('' + escHtml(t.name) + '')">Edit</button>' +
-            '<button type="button" class="btn btn-danger-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="deleteTemplate('' + escHtml(t.name) + '')">Delete</button>'
+          ? '<button type="button" class="btn btn-primary" style="padding:0.25rem 0.55rem;font-size:0.75rem;" data-tpl="' + escHtml(t.name) + '" onclick="useTemplate(this.dataset.tpl)">Use</button>' +
+            '<button type="button" class="btn btn-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" data-tpl="' + escHtml(t.name) + '" onclick="editTemplate(this.dataset.tpl)">Edit</button>' +
+            '<button type="button" class="btn btn-danger-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" data-tpl="' + escHtml(t.name) + '" onclick="deleteTemplate(this.dataset.tpl)">Delete</button>'
           : '';
         const tagsHtml = (t.tags_list || []).map(tg => '<span class="tag-pill">' + escHtml(tg) + '</span>').join(' ');
         const aliasHtml = (t.aliases_list && t.aliases_list.length) ? '<div style="font-size:0.72rem;color:var(--text-muted);">Voice aliases: ' + escHtml(t.aliases_list.join(', ')) + '</div>' : '';
@@ -2823,7 +2823,7 @@
       const el = document.getElementById('modal-tag-chips');
       if (!el) return;
       el.innerHTML = tagsCache.map(t =>
-        '<button type="button" class="chip-btn" onclick="appendModalTag('' + escHtml(t.tag_name) + '')">+ ' + escHtml(t.tag_name) + '</button>'
+        '<button type="button" class="chip-btn" data-tag="' + escHtml(t.tag_name) + '" onclick="appendModalTag(this.dataset.tag)">+ ' + escHtml(t.tag_name) + '</button>'
       ).join('');
     }
 
@@ -2845,8 +2845,8 @@
       el.innerHTML = tagsCache.map(t => {
         const todoBadge = t.is_todo ? ' <span class="tag-pill tag-pill-todo">To-Do</span>' : '';
         const actions = CAN_WRITE
-          ? '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.5rem;font-size:0.75rem;" onclick="editTag('' + escHtml(t.name) + '')">Edit</button>' +
-            '<button type="button" class="btn btn-danger-outline" style="padding:0.2rem 0.5rem;font-size:0.75rem;" onclick="deleteTag('' + escHtml(t.name) + '')">Delete</button>'
+          ? '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.5rem;font-size:0.75rem;" data-tagid="' + escHtml(t.name) + '" onclick="editTag(this.dataset.tagid)">Edit</button>' +
+            '<button type="button" class="btn btn-danger-outline" style="padding:0.2rem 0.5rem;font-size:0.75rem;" data-tagid="' + escHtml(t.name) + '" onclick="deleteTag(this.dataset.tagid)">Delete</button>'
           : '';
         return '<div class="acct-row">' +
           '<div><span class="tag-pill" style="border-color:' + escHtml(t.color) + ';"><span style="width:8px;height:8px;border-radius:50%;background:' + escHtml(t.color) + ';display:inline-block;"></span> ' + escHtml(t.tag_name) + '</span>' + todoBadge + '</div>' +
@@ -3139,9 +3139,9 @@
       }
       el.innerHTML = filtered.map(a => {
         const isPinned = pinnedSet.has(a.name);
-        const pinBtn = '<button type="button" class="pin-btn ' + (isPinned ? 'pinned' : '') + '" onclick="togglePinAccount('' + escHtml(a.name) + '')">' + (isPinned ? 'Pinned' : 'Pin') + '</button>';
+        const pinBtn = '<button type="button" class="pin-btn ' + (isPinned ? 'pinned' : '') + '" data-acct="' + escHtml(a.name) + '" onclick="togglePinAccount(this.dataset.acct)">' + (isPinned ? 'Pinned' : 'Pin') + '</button>';
         const adjBtn = CAN_WRITE
-          ? '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.5rem;font-size:0.74rem;" onclick="openAdjustModal('' + escHtml(a.name) + '')">Adjust</button>'
+          ? '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.5rem;font-size:0.74rem;" data-acct="' + escHtml(a.name) + '" onclick="openAdjustModal(this.dataset.acct)">Adjust</button>'
           : '';
         return '<div class="acct-row" style="flex-wrap:wrap;">' +
           '<div style="flex:1 1 200px;">' +
@@ -3253,8 +3253,8 @@
         const pct = Math.min(100, Math.round(b.percent_used || 0));
         const actions = CAN_WRITE
           ? '<div style="display:flex;gap:0.35rem;">' +
-              '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.5rem;font-size:0.74rem;" onclick="editBudget('' + escHtml(b.name) + '')">Edit</button>' +
-              '<button type="button" class="btn btn-danger-outline" style="padding:0.2rem 0.5rem;font-size:0.74rem;" onclick="deleteBudget('' + escHtml(b.name) + '')">Delete</button>' +
+              '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.5rem;font-size:0.74rem;" data-bud="' + escHtml(b.name) + '" onclick="editBudget(this.dataset.bud)">Edit</button>' +
+              '<button type="button" class="btn btn-danger-outline" style="padding:0.2rem 0.5rem;font-size:0.74rem;" data-bud="' + escHtml(b.name) + '" onclick="deleteBudget(this.dataset.bud)">Delete</button>' +
             '</div>'
           : '';
         return '<div class="acct-row" style="flex-direction:column;align-items:stretch;gap:0.45rem;">' +
