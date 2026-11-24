@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Mohammed Faisal and contributors
 # For license information, please see license.txt
 
+import json
 import frappe
 from frappe import _
 from frappe.desk.doctype.tag.tag import DocTags
@@ -468,6 +469,9 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 
 	tag_totals = sorted(tag_agg.values(), key=lambda x: (-x["amount"], x["tag_name"]))
 
+	budgets = _compute_budgets(company, target_month)
+	preferences = _get_user_preferences(frappe.session.user, company)
+
 	return {
 		"summary": summary,
 		"accounts": accounts,
@@ -476,6 +480,8 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 		"top_categories": top_categories,
 		"todo_transactions": todo_transactions,
 		"tag_totals": tag_totals,
+		"budgets": budgets,
+		"preferences": preferences,
 	}
 
 
@@ -1106,3 +1112,439 @@ def toggle_transaction_tag(voucher_no, tag_name, action="toggle"):
 	frappe.db.commit()
 	updated = _parse_csv_list(doc_tags.get_tags(voucher_no))
 	return {"voucher_no": voucher_no, "tags": updated}
+
+
+
+# --- Phase 3A: Accounts Overview, Balance Adjust, Budgets & Preferences ---
+
+DEFAULT_QUICK_AMOUNTS = "100,250,500,1000,2000,5000"
+
+
+def _parse_json_list(val):
+	if not val:
+		return []
+	if isinstance(val, list):
+		return [str(x).strip() for x in val if str(x).strip()]
+	try:
+		parsed = json.loads(val)
+		if isinstance(parsed, list):
+			return [str(x).strip() for x in parsed if str(x).strip()]
+	except Exception:
+		pass
+	return [x.strip() for x in str(val).split(",") if x.strip()]
+
+
+def _get_user_preferences(user, company):
+	row = frappe.db.get_value(
+		"Family Portal Preference",
+		{"user": user, "company": company},
+		["name", "quick_amounts", "default_from_account", "pinned_accounts", "hidden_cards"],
+		as_dict=True,
+	)
+	quick_str = (row.quick_amounts if row and row.quick_amounts else DEFAULT_QUICK_AMOUNTS).strip()
+	quick_list = []
+	for part in quick_str.split(","):
+		try:
+			num = flt(part.strip())
+			if num > 0:
+				quick_list.append(num)
+		except Exception:
+			pass
+	if not quick_list:
+		quick_list = [100, 250, 500, 1000, 2000, 5000]
+
+	return {
+		"name": row.name if row else None,
+		"user": user,
+		"company": company,
+		"quick_amounts": quick_str,
+		"quick_amounts_list": quick_list,
+		"default_from_account": (row.default_from_account if row else None) or "",
+		"pinned_accounts": _parse_json_list(row.pinned_accounts if row else None),
+		"hidden_cards": _parse_json_list(row.hidden_cards if row else None),
+	}
+
+
+def _find_adjustment_account(company, exclude_account):
+	preferred = [
+		"Reconciliation Adjustments",
+		"Temporary Opening",
+		"Opening Balance Equity",
+		"Round Off",
+		"Miscellaneous Expenses",
+	]
+	for acc_name in preferred:
+		match = frappe.db.get_value(
+			"Account",
+			{"company": company, "account_name": acc_name, "is_group": 0, "name": ["!=", exclude_account]},
+			"name",
+		)
+		if match:
+			return match
+	fallback = frappe.db.sql(
+		"""
+		SELECT name FROM `tabAccount`
+		WHERE company = %(company)s
+			AND is_group = 0
+			AND disabled = 0
+			AND name != %(excl)s
+			AND root_type IN ('Equity', 'Expense')
+		ORDER BY FIELD(root_type, 'Equity', 'Expense'), account_name ASC
+		LIMIT 1
+		""",
+		{"company": company, "excl": exclude_account},
+	)
+	if fallback:
+		return fallback[0][0]
+	frappe.throw(_("No adjustment / offset account found in Company '{0}'.").format(company))
+
+
+def _resolve_month_and_fy(month=None):
+	today_str = nowdate()
+	target_month = (month or today_str[:7]).strip()
+	try:
+		anchor = getdate(f"{target_month}-01")
+	except Exception:
+		anchor = getdate(today_str)
+		target_month = today_str[:7]
+	month_start = str(get_first_day(anchor))
+	month_end = str(get_last_day(anchor))
+	fy_start_year = anchor.year if anchor.month >= 4 else anchor.year - 1
+	fy_start = f"{fy_start_year}-04-01"
+	fy_end = f"{fy_start_year + 1}-03-31"
+	return target_month, month_start, month_end, fy_start, fy_end
+
+
+def _compute_budgets(company, month=None):
+	target_month, m_start, m_end, fy_start, fy_end = _resolve_month_and_fy(month)
+	budgets = frappe.get_all(
+		"Family Budget Limit",
+		filters={"company": company, "is_active": 1},
+		fields=["name", "budget_name", "expense_account", "period_type", "limit_amount", "is_active"],
+		order_by="budget_name asc",
+	)
+	if not budgets:
+		return []
+
+	acc_names = tuple({b.expense_account for b in budgets if b.expense_account})
+	acc_labels = {}
+	if acc_names:
+		for r in frappe.get_all(
+			"Account",
+			filters={"name": ["in", list(acc_names)]},
+			fields=["name", "account_name"],
+		):
+			acc_labels[r.name] = r.account_name
+
+	def _spent_map(start_d, end_d):
+		rows = frappe.db.sql(
+			"""
+			SELECT account, COALESCE(SUM(debit - credit), 0) AS spent
+			FROM `tabGL Entry`
+			WHERE company = %(company)s
+				AND is_cancelled = 0
+				AND account IN %(accounts)s
+				AND posting_date BETWEEN %(s)s AND %(e)s
+			GROUP BY account
+			""",
+			{"company": company, "accounts": acc_names, "s": start_d, "e": end_d},
+			as_dict=True,
+		)
+		return {r.account: flt(r.spent, 2) for r in rows}
+
+	monthly_spent = _spent_map(m_start, m_end) if acc_names else {}
+	yearly_spent = _spent_map(fy_start, fy_end) if acc_names else {}
+
+	out = []
+	for b in budgets:
+		limit_amt = flt(b.limit_amount, 2)
+		spent = yearly_spent.get(b.expense_account, 0.0) if b.period_type == "Yearly" else monthly_spent.get(b.expense_account, 0.0)
+		remaining = flt(limit_amt - spent, 2)
+		pct = round((spent / limit_amt) * 100, 1) if limit_amt > 0 else 0.0
+		if spent > limit_amt:
+			status = "over"
+		elif pct >= 80.0:
+			status = "warning"
+		else:
+			status = "ok"
+
+		out.append({
+			"name": b.name,
+			"budget_name": b.budget_name,
+			"expense_account": b.expense_account,
+			"expense_account_name": acc_labels.get(b.expense_account, b.expense_account),
+			"period_type": b.period_type,
+			"limit_amount": limit_amt,
+			"spent": spent,
+			"remaining": remaining,
+			"percent_used": pct,
+			"status": status,
+			"month": target_month,
+			"is_active": cint(b.is_active),
+		})
+	return out
+
+
+@frappe.whitelist()
+def get_accounts_overview():
+	"""Returns non-group accounts with live balances (Dr-Cr for Asset, Cr-Dr for Liability/Equity) and pin status."""
+	company, can_write = _resolve_portal_company()
+	prefs = _get_user_preferences(frappe.session.user, company)
+	pinned_set = set(prefs["pinned_accounts"])
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			acc.name,
+			acc.account_name,
+			acc.account_type,
+			acc.root_type,
+			acc.parent_account,
+			acc.disabled,
+			ROUND(COALESCE(SUM(gle.debit - gle.credit), 0), 2) AS raw_dr_cr,
+			COUNT(gle.name) AS tx_count,
+			MAX(gle.posting_date) AS last_date
+		FROM `tabAccount` acc
+		LEFT JOIN `tabGL Entry` gle
+			ON gle.account = acc.name
+			AND gle.company = %(company)s
+			AND gle.is_cancelled = 0
+		WHERE acc.company = %(company)s
+			AND acc.is_group = 0
+			AND (
+				acc.account_type IN ('Bank', 'Cash', 'Receivable', 'Payable')
+				OR {CREDIT_CARD_SQL}
+				OR acc.root_type IN ('Asset', 'Liability')
+			)
+		GROUP BY acc.name, acc.account_name, acc.account_type, acc.root_type, acc.parent_account, acc.disabled
+		HAVING acc.disabled = 0 OR ABS(raw_dr_cr) >= 0.01
+		ORDER BY acc.root_type ASC, acc.account_type DESC, acc.account_name ASC
+		""",
+		{"company": company},
+		as_dict=True,
+	)
+
+	items = []
+	for r in rows:
+		raw_val = flt(r.raw_dr_cr, 2)
+		bal = flt(-raw_val, 2) if r.root_type in ("Liability", "Equity") else raw_val
+		# Skip inactive/unused non-liquid zero accounts with 0 transactions
+		if not _is_liquid_account(r) and r.tx_count == 0 and abs(bal) < 0.01:
+			continue
+		items.append({
+			"name": r.name,
+			"account_name": r.account_name,
+			"account_type": r.account_type or "",
+			"root_type": r.root_type or "",
+			"parent_account": r.parent_account or "",
+			"group_label": _classify_account_group(r),
+			"balance": bal,
+			"tx_count": int(r.tx_count),
+			"last_date": str(r.last_date) if r.last_date else None,
+			"is_pinned": r.name in pinned_set,
+		})
+
+	items.sort(key=lambda x: (0 if x["is_pinned"] else 1, x["group_label"], x["account_name"]))
+	return {"items": items, "can_write": can_write, "company": company}
+
+
+@frappe.whitelist(methods=["POST"])
+def adjust_account_balance(account, target_balance, posting_date=None, description="Balance Adjustment"):
+	"""Creates and submits a balancing Journal Entry to bring account to target_balance."""
+	company, can_write = _resolve_portal_company()
+	if not can_write:
+		frappe.throw(_("You do not have write permission on this portal."), frappe.PermissionError)
+
+	acc_doc = _validate_account_belongs_to(account, company, "Account")
+	target_val = flt(target_balance, 2)
+	posting_date = str(getdate(posting_date)) if posting_date else nowdate()
+	description = (description or "Balance Adjustment").strip()
+
+	raw_res = frappe.db.sql(
+		"""
+		SELECT COALESCE(SUM(debit - credit), 0)
+		FROM `tabGL Entry`
+		WHERE company = %(company)s
+			AND account = %(account)s
+			AND is_cancelled = 0
+		""",
+		{"company": company, "account": account},
+	)
+	raw_dr_cr = flt(raw_res[0][0], 2) if raw_res else 0.0
+	is_credit_normal = acc_doc.root_type in ("Liability", "Equity", "Income")
+	current_balance = flt(-raw_dr_cr, 2) if is_credit_normal else raw_dr_cr
+	diff = flt(target_val - current_balance, 2)
+
+	if abs(diff) < 0.01:
+		return {
+			"adjusted": False,
+			"message": "Balance already matches",
+			"previous_balance": current_balance,
+			"new_balance": current_balance,
+		}
+
+	offset_account = _find_adjustment_account(company, account)
+	abs_diff = abs(diff)
+
+	# Determine debit/credit direction based on normal balance side
+	increase_debit_side = (diff > 0 and not is_credit_normal) or (diff < 0 and is_credit_normal)
+
+	je = frappe.new_doc("Journal Entry")
+	je.voucher_type = "Journal Entry"
+	je.company = company
+	je.posting_date = posting_date
+	je.user_remark = f"{description}: {acc_doc.name} ({current_balance} -> {target_val})"
+	if increase_debit_side:
+		je.append("accounts", {"account": account, "debit_in_account_currency": abs_diff, "credit_in_account_currency": 0})
+		je.append("accounts", {"account": offset_account, "debit_in_account_currency": 0, "credit_in_account_currency": abs_diff})
+	else:
+		je.append("accounts", {"account": offset_account, "debit_in_account_currency": abs_diff, "credit_in_account_currency": 0})
+		je.append("accounts", {"account": account, "debit_in_account_currency": 0, "credit_in_account_currency": abs_diff})
+
+	je.flags.ignore_permissions = True
+	je.insert()
+	je.submit()
+	frappe.db.commit()
+
+	return {
+		"adjusted": True,
+		"journal_entry": je.name,
+		"offset_account": offset_account,
+		"previous_balance": current_balance,
+		"new_balance": target_val,
+		"diff": diff,
+	}
+
+
+@frappe.whitelist()
+def get_budgets(month=None):
+	"""Returns active Family Budget Limit rows with live spent/remaining/status for month or FY."""
+	company, can_write = _resolve_portal_company()
+	target_month = _resolve_month_and_fy(month)[0]
+	return {
+		"items": _compute_budgets(company, target_month),
+		"month": target_month,
+		"can_write": can_write,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_budget(budget_name, expense_account, limit_amount, period_type="Monthly", is_active=1, name=None):
+	"""Creates or updates a Family Budget Limit strictly scoped to the user's locked Company."""
+	company, can_write = _resolve_portal_company()
+	if not can_write:
+		frappe.throw(_("You do not have write permission on this portal."), frappe.PermissionError)
+
+	budget_name = (budget_name or "").strip()
+	if not budget_name:
+		frappe.throw(_("Budget Name is required."))
+
+	limit_val = flt(limit_amount)
+	if limit_val <= 0:
+		frappe.throw(_("Limit Amount must be greater than zero."))
+
+	period_type = (period_type or "Monthly").strip()
+	if period_type not in ("Monthly", "Yearly"):
+		frappe.throw(_("Period Type must be Monthly or Yearly."))
+
+	_validate_account_belongs_to(expense_account, company, "Expense Account")
+
+	if name:
+		if not frappe.db.exists("Family Budget Limit", name):
+			frappe.throw(_("Budget '{0}' does not exist.").format(name))
+		doc = frappe.get_doc("Family Budget Limit", name)
+		if doc.company != company:
+			frappe.throw(_("Budget does not belong to Company '{0}'.").format(company), frappe.PermissionError)
+	else:
+		doc = frappe.new_doc("Family Budget Limit")
+		doc.company = company
+
+	doc.budget_name = budget_name
+	doc.expense_account = expense_account
+	doc.period_type = period_type
+	doc.limit_amount = limit_val
+	doc.is_active = 1 if cint(is_active) else 0
+	doc.flags.ignore_permissions = True
+	doc.save()
+	frappe.db.commit()
+
+	return {
+		"name": doc.name,
+		"company": doc.company,
+		"budget_name": doc.budget_name,
+		"expense_account": doc.expense_account,
+		"period_type": doc.period_type,
+		"limit_amount": flt(doc.limit_amount, 2),
+		"is_active": cint(doc.is_active),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_budget(name):
+	"""Deletes a Family Budget Limit belonging to the user's locked Company."""
+	company, can_write = _resolve_portal_company()
+	if not can_write:
+		frappe.throw(_("You do not have write permission on this portal."), frappe.PermissionError)
+
+	if not name or not frappe.db.exists("Family Budget Limit", name):
+		frappe.throw(_("Budget '{0}' does not exist.").format(name))
+	doc_company = frappe.db.get_value("Family Budget Limit", name, "company")
+	if doc_company != company:
+		frappe.throw(_("Budget does not belong to Company '{0}'.").format(company), frappe.PermissionError)
+
+	frappe.delete_doc("Family Budget Limit", name, ignore_permissions=True)
+	frappe.db.commit()
+	return {"status": "deleted", "name": name}
+
+
+@frappe.whitelist()
+def get_preferences():
+	"""Returns portal UI preferences for (user, company), or defaults if none exists."""
+	company, _can_write = _resolve_portal_company()
+	return _get_user_preferences(frappe.session.user, company)
+
+
+@frappe.whitelist(methods=["POST"])
+def save_preferences(quick_amounts=None, default_from_account=None, pinned_accounts=None, hidden_cards=None):
+	"""Upserts Family Portal Preference for (frappe.session.user, company)."""
+	company, _can_write = _resolve_portal_company()
+	user = frappe.session.user
+
+	existing_name = frappe.db.get_value(
+		"Family Portal Preference",
+		{"user": user, "company": company},
+		"name",
+	)
+	if existing_name:
+		doc = frappe.get_doc("Family Portal Preference", existing_name)
+	else:
+		doc = frappe.new_doc("Family Portal Preference")
+		doc.user = user
+		doc.company = company
+		doc.quick_amounts = DEFAULT_QUICK_AMOUNTS
+
+	if quick_amounts is not None:
+		clean_nums = []
+		for part in str(quick_amounts).split(","):
+			val = flt(part.strip())
+			if val > 0:
+				clean_nums.append(str(int(val) if val == int(val) else val))
+		doc.quick_amounts = ",".join(clean_nums) if clean_nums else DEFAULT_QUICK_AMOUNTS
+
+	if default_from_account is not None:
+		if default_from_account:
+			_validate_account_belongs_to(default_from_account, company, "Default From Account")
+			doc.default_from_account = default_from_account
+		else:
+			doc.default_from_account = None
+
+	if pinned_accounts is not None:
+		doc.pinned_accounts = json.dumps(_parse_json_list(pinned_accounts))
+
+	if hidden_cards is not None:
+		doc.hidden_cards = json.dumps(_parse_json_list(hidden_cards))
+
+	doc.flags.ignore_permissions = True
+	doc.save()
+	frappe.db.commit()
+	return _get_user_preferences(user, company)

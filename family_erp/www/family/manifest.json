@@ -1,0 +1,17 @@
+{
+  "name": "Family ERP Portal",
+  "short_name": "Family ERP",
+  "start_url": "/family",
+  "scope": "/family",
+  "display": "standalone",
+  "theme_color": "#1e3a8a",
+  "background_color": "#f8fafc",
+  "icons": [
+    {
+      "src": "/family/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
