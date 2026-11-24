@@ -6,6 +6,7 @@ from frappe import _
 
 
 FAMILY_VIEWER_ROLE = "Family Viewer"
+FAMILY_PORTAL_USER_ROLE = "Family Portal User"
 RESTRICTED_DOCTYPES = [
 	"Company",
 	"Account",
@@ -19,79 +20,86 @@ RESTRICTED_DOCTYPES = [
 ]
 
 
-def setup_family_viewer_role(allow_desk=False):
+def _configure_read_role(role_name, allow_desk=False):
 	"""
-	Creates or updates Role 'Family Viewer'.
-	If allow_desk is False, sets desk_access = 0 so Website Users can hold it.
-	Grants strictly Read + Report (read=1, report=1, write=0, create=0, delete=0, submit=0, cancel=0)
-	on key financial and property DocTypes.
+	Creates or updates a portal role with strict Read + Report permissions
+	across RESTRICTED_DOCTYPES. Keeps desk_access = 0 by default so Website Users can hold it.
 	"""
-	if not frappe.db.exists("Role", FAMILY_VIEWER_ROLE):
+	if not frappe.db.exists("Role", role_name):
 		role = frappe.new_doc("Role")
-		role.role_name = FAMILY_VIEWER_ROLE
+		role.role_name = role_name
 		role.desk_access = 1 if allow_desk else 0
 		role.insert(ignore_permissions=True)
-		print(f"Created Role: {FAMILY_VIEWER_ROLE}")
+		print(f"Created Role: {role_name}")
 	else:
-		role = frappe.get_doc("Role", FAMILY_VIEWER_ROLE)
+		role = frappe.get_doc("Role", role_name)
 		role.desk_access = 1 if allow_desk else 0
 		role.flags.ignore_permissions = True
 		role.save()
+
+	props = {
+		"read": 1,
+		"report": 1,
+		"write": 0,
+		"create": 0,
+		"delete": 0,
+		"submit": 0,
+		"cancel": 0,
+		"amend": 0,
+		"print": 1,
+		"export": 1,
+	}
 
 	for dt in RESTRICTED_DOCTYPES:
 		if not frappe.db.exists("DocType", dt):
 			continue
 
-		# Check if permission already exists for this role at permlevel 0
 		existing_perm = frappe.db.get_value(
 			"Custom DocPerm",
-			{"parent": dt, "role": FAMILY_VIEWER_ROLE, "permlevel": 0},
+			{"parent": dt, "role": role_name, "permlevel": 0},
 			"name",
 		)
 		if not existing_perm:
-			# Also check standard DocPerm
 			existing_standard_perm = frappe.db.get_value(
 				"DocPerm",
-				{"parent": dt, "role": FAMILY_VIEWER_ROLE, "permlevel": 0},
+				{"parent": dt, "role": role_name, "permlevel": 0},
 				"name",
 			)
 			if not existing_standard_perm:
-				frappe.permissions.add_permission(dt, FAMILY_VIEWER_ROLE, 0)
+				frappe.permissions.add_permission(dt, role_name, 0)
 
-		# Explicitly set permissions: read=1, report=1, write=0, create=0, delete=0, submit=0, cancel=0
-		props = {
-			"read": 1,
-			"report": 1,
-			"write": 0,
-			"create": 0,
-			"delete": 0,
-			"submit": 0,
-			"cancel": 0,
-			"amend": 0,
-			"print": 1,
-			"export": 1,
-		}
 		for ptype, val in props.items():
 			try:
 				frappe.permissions.update_permission_property(
-					dt, FAMILY_VIEWER_ROLE, 0, ptype, val, validate=False
+					dt, role_name, 0, ptype, val, validate=False
 				)
 			except Exception:
 				pass
 
 	frappe.db.commit()
-	print(f"Configured strict Read + Report permissions for '{FAMILY_VIEWER_ROLE}' (desk_access={1 if allow_desk else 0})")
+	print(f"Configured strict Read + Report permissions for '{role_name}' (desk_access={1 if allow_desk else 0})")
 
 
-def provision_family_user(email, first_name, company, password=None, allow_desk=False):
+def setup_family_viewer_role(allow_desk=False):
+	"""Creates or updates Role 'Family Viewer' (read-only portal viewer)."""
+	_configure_read_role(FAMILY_VIEWER_ROLE, allow_desk=allow_desk)
+
+
+def setup_family_portal_user_role(allow_desk=False):
+	"""Creates or updates Role 'Family Portal User' (portal read + API write, desk_access=0)."""
+	_configure_read_role(FAMILY_PORTAL_USER_ROLE, allow_desk=allow_desk)
+
+
+def provision_family_user(email, first_name, company, password=None, allow_desk=False, role=None):
 	"""
 	Creates or updates a user for portal access.
 	If allow_desk is False (default): sets user_type = 'Website User' for portal-only access.
-	If allow_desk is True: sets user_type = 'System User' with Family Viewer role.
+	If allow_desk is True: sets user_type = 'System User'.
 	Creates User Permission locked to company with apply_to_all_doctypes=1.
 	Sets password if provided.
 	"""
-	setup_family_viewer_role(allow_desk=allow_desk)
+	target_role = role or FAMILY_VIEWER_ROLE
+	_configure_read_role(target_role, allow_desk=allow_desk)
 
 	if not frappe.db.exists("Company", company):
 		frappe.throw(_("Company {0} does not exist").format(company))
@@ -107,9 +115,9 @@ def provision_family_user(email, first_name, company, password=None, allow_desk=
 
 	user.user_type = "System User" if allow_desk else "Website User"
 
-	# Set Family Viewer role
+	# Set portal role
 	user.roles = []
-	user.append("roles", {"role": FAMILY_VIEWER_ROLE})
+	user.append("roles", {"role": target_role})
 	user.default_workspace = "Family ERP" if allow_desk else ""
 
 	user.flags.ignore_permissions = True
@@ -117,7 +125,6 @@ def provision_family_user(email, first_name, company, password=None, allow_desk=
 	user.save()
 
 	if password:
-		from frappe.utils.password_strength import test_password_strength
 		user_pass = frappe.get_doc("User", email)
 		user_pass.new_password = password
 		user_pass.flags.ignore_permissions = True
@@ -157,5 +164,5 @@ def provision_family_user(email, first_name, company, password=None, allow_desk=
 		frappe.delete_doc("User Permission", p_name, ignore_permissions=True)
 
 	frappe.db.commit()
-	print(f"Provisioned user {email} (Desk: {allow_desk}) locked to company {company}")
+	print(f"Provisioned user {email} (Role: {target_role}, Desk: {allow_desk}) locked to company {company}")
 	return user

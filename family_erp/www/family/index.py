@@ -74,7 +74,12 @@ def get_context(context):
 	context["all_companies"] = all_mapped_companies
 	context["selected_company"] = company
 	context["user_name"] = frappe.utils.get_fullname(user) or user
-	context["csrf_token"] = frappe.sessions.get_csrf_token()
+	context["csrf_token"] = (
+		frappe.sessions.get_csrf_token()
+		if getattr(frappe.local, "session_obj", None)
+		else (frappe.local.session.data.csrf_token or "")
+	)
+	context["can_write"] = ("Family Portal User" in user_roles or is_system_manager)
 	context["title"] = f"{company} - Family Portal"
 
 	# Date filters
