@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/assets/frappe/css/frappe-web.css">
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --bg-page: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --success-bg: #ecfdf5;
+      --success-text: #065f46;
+      --warning-bg: #fffbeb;
+      --warning-text: #92400e;
+      --danger-bg: #fef2f2;
+      --danger-text: #991b1b;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text-main);
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      background: var(--card-bg);
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 1.5rem;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+
+    .brand-text h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 0;
+      color: var(--text-main);
+    }
+
+    .brand-text p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .actions-section {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #172554;
+      color: white;
+    }
+
+    .btn-outline {
+      background: white;
+      border-color: var(--border-color);
+      color: var(--text-main);
+    }
+    .btn-outline:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+
+    .btn-danger-outline {
+      background: white;
+      border-color: #fecaca;
+      color: var(--danger-text);
+    }
+    .btn-danger-outline:hover {
+      background: var(--danger-bg);
+    }
+
+    .company-select {
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-size: 0.875rem;
+      background-color: #f8fafc;
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    /* Net Balance Card */
+    .balance-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .balance-info {
+      flex: 1 1 300px;
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 0.3rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .badge-payable {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .badge-credit {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .badge-settled {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .balance-amount {
+      font-size: 2.25rem;
+      font-weight: 800;
+      margin: 0.25rem 0;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .balance-subtext {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .stats-counters {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .counter-item {
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      text-align: center;
+      min-width: 110px;
+    }
+
+    .counter-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .counter-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-top: 0.2rem;
+    }
+
+    /* Tabs Navigation */
+    .tabs-nav {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 2px solid var(--border-color);
+      margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--primary);
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Filter Toolbar */
+    .filter-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      background: var(--card-bg);
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+
+    .quick-presets {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .date-filter-form {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .date-input {
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+
+    /* Responsive Statement Table */
+    .table-container {
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      overflow-x: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .statement-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    .statement-table th {
+      background: #f8fafc;
+      padding: 0.85rem 1rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .statement-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+    }
+
+    .statement-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .statement-table tr:hover {
+      background-color: #fafbfc;
+    }
+
+    .statement-table td.num, .statement-table th.num {
+      text-align: right;
+    }
+
+    .row-total {
+      background: #f1f5f9;
+      font-weight: 700;
+    }
+
+    /* Property Cards Grid */
+    .properties-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .property-card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      padding: 1.25rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .property-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+
+    .property-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 0;
+    }
+
+    .badge-prop-type {
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .meta-list {
+      margin: 0.75rem 0;
+      font-size: 0.875rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .meta-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px dashed #f1f5f9;
+    }
+
+    .meta-label {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .meta-val {
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .copy-btn {
+      background: #f1f5f9;
+      border: none;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+    .copy-btn:hover {
+      background: #e2e8f0;
+      color: var(--text-main);
+    }
+
+    /* Multi-meter EB list inside card */
+    .eb-section {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-top: 0.75rem;
+      border: 1px solid #f1f5f9;
+    }
+
+    .eb-header {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .eb-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #edf2f7;
+    }
+    .eb-item:last-child {
+      border-bottom: none;
+    }
+
+    .eb-num {
+      font-family: monospace;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .eb-consumer {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      max-width: 140px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    /* Print Specific Styling */
+    @media print {
+      body {
+        background: #fff !important;
+        color: #000 !important;
+      }
+      .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+      }
+      .top-bar, .actions-section, .tabs-nav, .filter-toolbar, .copy-btn, .btn, .company-select {
+        display: none !important;
+      }
+      .balance-card {
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+        margin-bottom: 1rem !important;
+      }
+      .table-container {
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+      }
+      .statement-table th, .statement-table td {
+        border: 1px solid #ddd !important;
+        color: #000 !important;
+      }
+      .tab-content {
+        display: block !important;
+      }
+      #tab-properties {
+        page-break-before: always;
+      }
+      .property-card {
+        border: 1px solid #000 !important;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    {% if no_company_linked %}
+    <div style="background: white; padding: 2rem; border-radius: 12px; text-align: center; border: 1px solid var(--border-color);">
+      <h2>No Family Company Linked</h2>
+      <p style="color: var(--text-muted);">Your account does not have a linked Family Company permission. Please contact the administrator.</p>
+      <a href="/login" class="btn btn-outline">Back to Login</a>
+    </div>
+    {% else %}
+
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="brand-section">
+        <div class="brand-icon">F</div>
+        <div class="brand-text">
+          <h1>{{ selected_company }}</h1>
+          <p>Family Financial Portal &bull; {{ user_name }}</p>
+        </div>
+      </div>
+
+      <div class="actions-section">
+        {% if is_admin_preview %}
+        <label for="companySwitch" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Switch Company:</label>
+        <select id="companySwitch" class="company-select" onchange="switchCompany(this.value)">
+          {% for c in all_companies %}
+          <option value="{{ c }}" {% if c == selected_company %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+        <a href="/app" class="btn btn-outline">Desk</a>
+        {% endif %}
+
+        <button onclick="window.print()" class="btn btn-outline">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print Statement
+        </button>
+
+        <a href="/?cmd=web_logout" class="btn btn-danger-outline">Logout</a>
+      </div>
+    </header>
+
+    <!-- Net Balance Banner Card -->
+    <section class="balance-card">
+      <div class="balance-info">
+        <span class="badge-status badge-{{ balance_status_badge }}">{{ balance_status_text }}</span>
+        <div class="balance-amount">{{ net_balance_formatted }}</div>
+        <p class="balance-subtext">{{ balance_subtext }}</p>
+      </div>
+
+      <div class="stats-counters">
+        <div class="counter-item">
+          <div class="counter-value">{{ properties_count }}</div>
+          <div class="counter-label">Properties</div>
+        </div>
+        <div class="counter-item">
+          <div class="counter-value">{{ active_meters_count }}</div>
+          <div class="counter-label">TNEB Meters</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabs Navigation -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" onclick="showTab('statement', this)">Statement of Account</button>
+      <button class="tab-btn" onclick="showTab('properties', this)">My Properties &amp; Utilities ({{ properties_count }})</button>
+    </nav>
+
+    <!-- Tab 1: Statement of Account -->
+    <div id="tab-statement" class="tab-content active">
+      <div class="filter-toolbar">
+        <div class="quick-presets">
+          <button type="button" class="btn btn-outline" onclick="setDateRange('2022-04-01', '2027-12-31')">All Time</button>
+          <button type="button" class="btn btn-outline" onclick="setDateRange('2026-04-01', '2027-03-31')">FY 2026-27</button>
+        </div>
+
+        <form method="GET" class="date-filter-form">
+          {% if is_admin_preview %}
+          <input type="hidden" name="company" value="{{ selected_company }}">
+          {% endif %}
+          <input type="date" name="from_date" id="from_date" value="{{ from_date }}" class="date-input">
+          <span style="color: var(--text-muted);">&ndash;</span>
+          <input type="date" name="to_date" id="to_date" value="{{ to_date }}" class="date-input">
+          <button type="submit" class="btn btn-primary">Apply</button>
+        </form>
+      </div>
+
+      <div class="table-container">
+        <table class="statement-table">
+          <thead>
+            <tr>
+              <th style="width: 120px;">Date</th>
+              <th>Description</th>
+              <th class="num" style="width: 140px;">Settled / Paid (Dr)</th>
+              <th class="num" style="width: 140px;">Billed / Due (Cr)</th>
+              <th class="num" style="width: 160px;">Net Due Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in statement_rows %}
+            <tr>
+              <td>{{ row.posting_date or '-' }}</td>
+              <td>
+                <div style="font-weight: 500;">{{ row.description }}</div>
+                {% if row.voucher_no %}
+                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.voucher_type }}: {{ row.voucher_no }}</div>
+                {% endif %}
+              </td>
+              <td class="num">{{ row.debit_formatted }}</td>
+              <td class="num">{{ row.credit_formatted }}</td>
+              <td class="num" style="font-weight: 600;">{{ row.balance_formatted }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No transactions found for this period.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="row-total">
+              <td colspan="2" style="font-weight: 700;">Total for Selected Period</td>
+              <td class="num">{{ total_debit_formatted }}</td>
+              <td class="num">{{ total_credit_formatted }}</td>
+              <td class="num" style="font-size: 1.05rem;">{{ net_balance_formatted }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: Properties & Utilities -->
+    <div id="tab-properties" class="tab-content">
+      <div class="properties-grid">
+        {% for prop in properties %}
+        <div class="property-card">
+          <div>
+            <div class="property-card-header">
+              <h3 class="property-title">{{ prop.property_name }}</h3>
+              <span class="badge-prop-type">{{ prop.property_type or 'Property' }}</span>
+            </div>
+
+            <div class="meta-list">
+              <div class="meta-item">
+                <span class="meta-label">Cost Center</span>
+                <span class="meta-val" style="font-size: 0.8rem; color: var(--text-muted);">{{ prop.cost_center or '-' }}</span>
+              </div>
+
+              {% if prop.property_tax_assessment_no %}
+              <div class="meta-item">
+                <span class="meta-label">Property Tax No</span>
+                <span class="meta-val">
+                  <code>{{ prop.property_tax_assessment_no }}</code>
+                  <button type="button" class="copy-btn" onclick="copyText('{{ prop.property_tax_assessment_no }}')">Copy</button>
+                </span>
+              </div>
+              {% endif %}
+
+              {% if prop.water_tax_assessment_no %}
+              <div class="meta-item">
+                <span class="meta-label">CMWSSB Water Tax No</span>
+                <span class="meta-val">
+                  <code>{{ prop.water_tax_assessment_no }}</code>
+                  <button type="button" class="copy-btn" onclick="copyText('{{ prop.water_tax_assessment_no }}')">Copy</button>
+                </span>
+              </div>
+              {% endif %}
+            </div>
+
+            <!-- TNEB Services -->
+            <div class="eb-section">
+              <div class="eb-header">
+                <span>TNEB Service Numbers</span>
+                <span>({{ prop.eb_services | length }})</span>
+              </div>
+
+              {% if prop.eb_services %}
+                {% for eb in prop.eb_services %}
+                <div class="eb-item">
+                  <div>
+                    <span class="eb-num">{{ eb.service_no }}</span>
+                    {% if eb.meter_label %}
+                    <span style="font-size: 0.75rem; color: #4b5563;">&bull; {{ eb.meter_label }}</span>
+                    {% endif %}
+                    {% if eb.consumer_name %}
+                    <div class="eb-consumer">{{ eb.consumer_name }}</div>
+                    {% endif %}
+                  </div>
+                  <button type="button" class="copy-btn" onclick="copyText('{{ eb.service_no }}')">Copy</button>
+                </div>
+                {% endfor %}
+              {% else %}
+                <div style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">No active meters recorded</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div style="grid-column: 1 / -1; background: white; padding: 2rem; border-radius: 12px; text-align: center; border: 1px solid var(--border-color);">
+          <p style="color: var(--text-muted); margin: 0;">No properties currently registered under {{ selected_company }}.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% endif %}
+  </div>
+
+  <script>
+    function showTab(tabId, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      btn.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+    }
+
+    function switchCompany(comp) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('company', comp);
+      window.location.href = url.toString();
+    }
+
+    function setDateRange(from, to) {
+      document.getElementById('from_date').value = from;
+      document.getElementById('to_date').value = to;
+      document.querySelector('.date-filter-form').submit();
+    }
+
+    function copyText(txt) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(txt).then(() => {
+          frappe && frappe.show_alert ? frappe.show_alert({message: "Copied: " + txt, indicator: "green"}) : alert("Copied: " + txt);
+        });
+      } else {
+        alert("Copied: " + txt);
+      }
+    }
+  </script>
+</body>
+</html>

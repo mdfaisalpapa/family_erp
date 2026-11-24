@@ -96,7 +96,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "family_erp.install.before_install"
-# after_install = "family_erp.install.after_install"
+after_install = "family_erp.setup.install.after_install"
 
 # Uninstallation
 # ------------
@@ -279,3 +279,5 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+
+get_website_user_home_page = "family_erp.www.family.index.get_home_page"

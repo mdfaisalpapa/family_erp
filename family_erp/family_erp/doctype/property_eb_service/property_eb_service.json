@@ -1,0 +1,54 @@
+{
+ "actions": [],
+ "creation": "2026-11-24 07:25:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "service_no",
+  "consumer_name",
+  "meter_label",
+  "is_active"
+ ],
+ "fields": [
+  {
+   "fieldname": "service_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "TNEB Service No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "consumer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Consumer Name on Bill"
+  },
+  {
+   "fieldname": "meter_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Unit / Floor / Note"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-24 07:25:00.000000",
+ "modified_by": "Administrator",
+ "module": "Family ERP",
+ "name": "Property EB Service",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}

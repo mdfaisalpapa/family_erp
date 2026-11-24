@@ -1,0 +1,221 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-11-24 03:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "lease_agreement",
+  "property",
+  "owner_company",
+  "tenant",
+  "column_break_dates",
+  "posting_date",
+  "billing_month",
+  "section_break_bill_items",
+  "rent_amount",
+  "eb_prev_reading",
+  "eb_curr_reading",
+  "eb_units",
+  "eb_rate",
+  "eb_amount",
+  "column_break_charges",
+  "water_amount",
+  "other_charges",
+  "other_charges_note",
+  "total_amount",
+  "section_break_invoice",
+  "sales_invoice",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "default": "TMB-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "TMB-.YYYY.-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lease_agreement",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Lease Agreement",
+   "options": "Lease Agreement",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "lease_agreement.property",
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "label": "Property",
+   "options": "Property",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "lease_agreement.owner_company",
+   "fieldname": "owner_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Owner Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "lease_agreement.tenant",
+   "fieldname": "tenant",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Tenant",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "billing_month",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Billing Month",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_bill_items",
+   "fieldtype": "Section Break",
+   "label": "Rent & Electricity"
+  },
+  {
+   "fetch_from": "lease_agreement.monthly_rent",
+   "fieldname": "rent_amount",
+   "fieldtype": "Currency",
+   "label": "Rent Amount"
+  },
+  {
+   "fieldname": "eb_prev_reading",
+   "fieldtype": "Float",
+   "label": "EB Previous Reading"
+  },
+  {
+   "fieldname": "eb_curr_reading",
+   "fieldtype": "Float",
+   "label": "EB Current Reading"
+  },
+  {
+   "fieldname": "eb_units",
+   "fieldtype": "Float",
+   "label": "EB Units",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "lease_agreement.eb_rate_per_unit",
+   "fieldname": "eb_rate",
+   "fieldtype": "Currency",
+   "label": "EB Rate Per Unit"
+  },
+  {
+   "fieldname": "eb_amount",
+   "fieldtype": "Currency",
+   "label": "EB Amount"
+  },
+  {
+   "fieldname": "column_break_charges",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "lease_agreement.fixed_water_charge",
+   "fieldname": "water_amount",
+   "fieldtype": "Currency",
+   "label": "Water Amount"
+  },
+  {
+   "fieldname": "other_charges",
+   "fieldtype": "Currency",
+   "label": "Other Charges"
+  },
+  {
+   "fieldname": "other_charges_note",
+   "fieldtype": "Data",
+   "label": "Other Charges Note"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_invoice",
+   "fieldtype": "Section Break",
+   "label": "Invoice Reference"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Tenant Monthly Bill",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-11-24 03:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Family ERP",
+ "name": "Tenant Monthly Bill",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "posting_date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,143 @@
+{
+ "actions": [],
+ "autoname": "field:property_name",
+ "creation": "2026-11-24 03:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "property_name",
+  "owner_company",
+  "cost_center",
+  "property_type",
+  "is_active",
+  "column_break_tax",
+  "eb_consumer_no",
+  "eb_services",
+  "water_consumer_no",
+  "property_tax_assessment_no",
+  "water_tax_assessment_no",
+  "section_break_address",
+  "address"
+ ],
+ "fields": [
+  {
+   "fieldname": "property_name",
+   "fieldtype": "Data",
+   "label": "Property Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "owner_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Owner Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "property_type",
+   "fieldtype": "Select",
+   "label": "Property Type",
+   "options": "Flat\nIndependent House\nCommercial\nPlot"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "column_break_tax",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "eb_consumer_no",
+   "fieldtype": "Data",
+   "label": "Primary / All EB Consumer Nos",
+   "length": 255
+  },
+  {
+   "fieldname": "eb_services",
+   "fieldtype": "Table",
+   "label": "TNEB Service Numbers",
+   "options": "Property EB Service"
+  },
+  {
+   "fieldname": "water_consumer_no",
+   "fieldtype": "Data",
+   "label": "Water Consumer No"
+  },
+  {
+   "fieldname": "property_tax_assessment_no",
+   "fieldtype": "Data",
+   "label": "Property Tax Assessment No"
+  },
+  {
+   "fieldname": "water_tax_assessment_no",
+   "fieldtype": "Data",
+   "label": "Water Tax Assessment No"
+  },
+  {
+   "fieldname": "section_break_address",
+   "fieldtype": "Section Break",
+   "label": "Address"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-24 03:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Family ERP",
+ "name": "Property",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Family Viewer"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "property_name",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,159 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-11-24 03:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "property",
+  "owner_company",
+  "tenant",
+  "status",
+  "column_break_dates",
+  "start_date",
+  "end_date",
+  "section_break_commercials",
+  "monthly_rent",
+  "security_deposit",
+  "column_break_utilities",
+  "eb_rate_per_unit",
+  "water_charge_type",
+  "fixed_water_charge"
+ ],
+ "fields": [
+  {
+   "default": "LEASE-.YYYY.-.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "LEASE-.YYYY.-.####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Property",
+   "options": "Property",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "property.owner_company",
+   "fieldname": "owner_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Owner Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tenant",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Tenant",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nExpired\nTerminated"
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date"
+  },
+  {
+   "fieldname": "section_break_commercials",
+   "fieldtype": "Section Break",
+   "label": "Rent & Deposit"
+  },
+  {
+   "fieldname": "monthly_rent",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Monthly Rent",
+   "reqd": 1
+  },
+  {
+   "fieldname": "security_deposit",
+   "fieldtype": "Currency",
+   "label": "Security Deposit"
+  },
+  {
+   "fieldname": "column_break_utilities",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "eb_rate_per_unit",
+   "fieldtype": "Currency",
+   "label": "EB Rate Per Unit"
+  },
+  {
+   "default": "Fixed",
+   "fieldname": "water_charge_type",
+   "fieldtype": "Select",
+   "label": "Water Charge Type",
+   "options": "Fixed\nMetered"
+  },
+  {
+   "default": "0",
+   "fieldname": "fixed_water_charge",
+   "fieldtype": "Currency",
+   "label": "Fixed Water Charge"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-24 03:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Family ERP",
+ "name": "Lease Agreement",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
