@@ -797,9 +797,10 @@
       font-weight: 700;
       text-transform: uppercase;
     }
-    .tx-badge-Withdrawal { background: var(--danger-bg); color: var(--danger-text); }
-    .tx-badge-Deposit { background: var(--success-bg); color: var(--success-text); }
+    .tx-badge-Expense, .tx-badge-Withdrawal { background: var(--danger-bg); color: var(--danger-text); }
+    .tx-badge-Income, .tx-badge-Deposit { background: var(--success-bg); color: var(--success-text); }
     .tx-badge-Transfer { background: #eff6ff; color: #1d4ed8; }
+    .tx-badge-Family { background: #f3e8ff; color: #6b21a8; }
 
     /* Modal */
     .modal-backdrop {
@@ -1210,8 +1211,8 @@
       <div class="filter-toolbar">
         <div class="pill-group" id="tx-type-pills">
           <button type="button" class="pill-btn active" onclick="setTxTypeFilter('', this)">All</button>
-          <button type="button" class="pill-btn" onclick="setTxTypeFilter('Withdrawal', this)">Withdrawal</button>
-          <button type="button" class="pill-btn" onclick="setTxTypeFilter('Deposit', this)">Deposit</button>
+          <button type="button" class="pill-btn" onclick="setTxTypeFilter('Expense', this)">Expense</button>
+          <button type="button" class="pill-btn" onclick="setTxTypeFilter('Income', this)">Income</button>
           <button type="button" class="pill-btn" onclick="setTxTypeFilter('Transfer', this)">Transfer</button>
         </div>
         <div class="date-filter-form">
@@ -1757,8 +1758,8 @@
         <div class="form-field">
           <label>Transaction Type</label>
           <div class="pill-group" id="modal-tx-type-pills">
-            <button type="button" class="pill-btn active" data-type="Withdrawal" onclick="setModalTxType('Withdrawal', this)">Withdrawal</button>
-            <button type="button" class="pill-btn" data-type="Deposit" onclick="setModalTxType('Deposit', this)">Deposit</button>
+            <button type="button" class="pill-btn active" data-type="Expense" onclick="setModalTxType('Expense', this)">Expense</button>
+            <button type="button" class="pill-btn" data-type="Income" onclick="setModalTxType('Income', this)">Income</button>
             <button type="button" class="pill-btn" data-type="Transfer" onclick="setModalTxType('Transfer', this)">Transfer</button>
             <button type="button" class="pill-btn" id="btn-tx-family" data-type="Family" onclick="setModalTxType('Family', this)">Family</button>
           </div>
@@ -1843,8 +1844,8 @@
         <div class="form-field">
           <label for="tpl-tx-type">Transaction Type</label>
           <select id="tpl-tx-type" class="form-control" onchange="syncTemplateModalAccounts()">
-            <option value="Withdrawal">Withdrawal</option>
-            <option value="Deposit">Deposit</option>
+            <option value="Expense">Expense</option>
+            <option value="Income">Income</option>
             <option value="Transfer">Transfer</option>
             <option value="Family">Family</option>
           </select>
@@ -2012,7 +2013,7 @@
     const TX_LIMIT = 50;
     let txTypeFilter = '';
     let txSearchTimer = null;
-    let modalTxType = 'Withdrawal';
+    let modalTxType = 'Expense';
     let templatesCache = [];
     let tagsCache = [];
     let speechRec = null;
@@ -2401,10 +2402,18 @@
       selEl.innerHTML = opts;
     }
 
+    function normalizeTxType(t) {
+      if (t === 'Withdrawal') return 'Expense';
+      if (t === 'Deposit') return 'Income';
+      return t || 'Expense';
+    }
+
     function setModalTxType(type, btn) {
+      type = normalizeTxType(type);
       modalTxType = type;
       document.querySelectorAll('#modal-tx-type-pills .pill-btn').forEach(b => b.classList.remove('active'));
-      if (btn) btn.classList.add('active');
+      const targetBtn = btn || document.querySelector('#modal-tx-type-pills .pill-btn[data-type="' + type + '"]');
+      if (targetBtn) targetBtn.classList.add('active');
       if (!formOptionsCache) return;
 
       const fromSel = document.getElementById('tx-from-account');
@@ -2424,15 +2433,15 @@
         famBox.style.display = 'none';
         toGroup.style.display = 'block';
         toSel.required = true;
-        if (type === 'Withdrawal') {
+        if (type === 'Expense') {
           fromLbl.textContent = 'Paid From (Bank/Cash/Card)';
-          toLbl.textContent = 'Expense / Target Account';
-          fillSelect(fromSel, formOptionsCache.bank_cash.concat(formOptionsCache.other_assets_liabilities), false);
-          fillSelect(toSel, formOptionsCache.expense.concat(formOptionsCache.other_assets_liabilities, formOptionsCache.bank_cash), false);
-        } else if (type === 'Deposit') {
-          fromLbl.textContent = 'Income / Source Account';
-          toLbl.textContent = 'Deposited To (Bank/Cash)';
-          fillSelect(fromSel, formOptionsCache.income.concat(formOptionsCache.other_assets_liabilities), false);
+          toLbl.textContent = 'Expense Account';
+          fillSelect(fromSel, formOptionsCache.bank_cash, false);
+          fillSelect(toSel, formOptionsCache.expense, false);
+        } else if (type === 'Income') {
+          fromLbl.textContent = 'Income Account';
+          toLbl.textContent = 'Deposit To (Bank/Cash/Card)';
+          fillSelect(fromSel, formOptionsCache.income, false);
           fillSelect(toSel, formOptionsCache.bank_cash, false);
         } else {
           fromLbl.textContent = 'From Account';
@@ -2466,7 +2475,7 @@
       renderModalTagChips();
       renderTemplateBars();
       renderDynamicQuickChips();
-      setModalTxType('Withdrawal', document.querySelector('#modal-tx-type-pills .pill-btn[data-type="Withdrawal"]'));
+      setModalTxType('Expense', document.querySelector('#modal-tx-type-pills .pill-btn[data-type="Expense"]'));
       if (preferencesCache.default_from_account && document.getElementById('tx-from-account')) {
         const fromSel = document.getElementById('tx-from-account');
         if ([...fromSel.options].some(o => o.value === preferencesCache.default_from_account)) {
@@ -2674,8 +2683,9 @@
       const t = templatesCache.find(x => x.name === name);
       if (!t) return;
       await openTxModal();
-      const pill = document.querySelector('#modal-tx-type-pills .pill-btn[data-type="' + t.tx_type + '"]');
-      setModalTxType(t.tx_type, pill);
+      const normType = normalizeTxType(t.tx_type);
+      const pill = document.querySelector('#modal-tx-type-pills .pill-btn[data-type="' + normType + '"]');
+      setModalTxType(normType, pill);
       if (t.default_amount > 0) {
         document.getElementById('tx-amount-expr').value = String(t.default_amount);
         updateAmountPreview();
@@ -2693,7 +2703,7 @@
 
     async function syncTemplateModalAccounts() {
       const opts = await ensureFormOptions();
-      const txType = document.getElementById('tpl-tx-type').value;
+      const txType = normalizeTxType(document.getElementById('tpl-tx-type').value);
       const famBox = document.getElementById('tpl-family-fields');
       const toGroup = document.getElementById('tpl-to-group');
       const fromSel = document.getElementById('tpl-from-account');
@@ -2709,9 +2719,17 @@
       } else {
         famBox.style.display = 'none';
         toGroup.style.display = 'block';
-        const all = opts.bank_cash.concat(opts.expense, opts.income, opts.other_assets_liabilities);
-        fillSelect(fromSel, all, true);
-        fillSelect(toSel, all, true);
+        if (txType === 'Expense') {
+          fillSelect(fromSel, opts.bank_cash, true);
+          fillSelect(toSel, opts.expense, true);
+        } else if (txType === 'Income') {
+          fillSelect(fromSel, opts.income, true);
+          fillSelect(toSel, opts.bank_cash, true);
+        } else {
+          const transferOpts = opts.bank_cash.concat(opts.other_assets_liabilities);
+          fillSelect(fromSel, transferOpts, true);
+          fillSelect(toSel, transferOpts, true);
+        }
       }
     }
 
@@ -2719,7 +2737,7 @@
       document.getElementById('tpl-modal-title').textContent = 'New Template';
       document.getElementById('tpl-edit-name').value = '';
       document.getElementById('tpl-name').value = '';
-      document.getElementById('tpl-tx-type').value = 'Withdrawal';
+      document.getElementById('tpl-tx-type').value = 'Expense';
       document.getElementById('tpl-amount').value = '';
       document.getElementById('tpl-description').value = '';
       document.getElementById('tpl-tags').value = '';
@@ -2734,7 +2752,7 @@
       document.getElementById('tpl-modal-title').textContent = 'Edit Template';
       document.getElementById('tpl-edit-name').value = t.name;
       document.getElementById('tpl-name').value = t.template_name || '';
-      document.getElementById('tpl-tx-type').value = t.tx_type || 'Withdrawal';
+      document.getElementById('tpl-tx-type').value = normalizeTxType(t.tx_type || 'Expense');
       await syncTemplateModalAccounts();
       if (t.from_account) document.getElementById('tpl-from-account').value = t.from_account;
       if (t.to_account) document.getElementById('tpl-to-account').value = t.to_account;
@@ -3010,10 +3028,10 @@
       }
 
       // 2. Infer tx_type
-      let tx_type = 'Withdrawal';
-      if (/(received|income|salary|dividend|refund|deposit|credited)/.test(lower)) {
-        tx_type = 'Deposit';
-      } else if (/(transfer|moved|shifted)/.test(lower)) {
+      let tx_type = 'Expense';
+      if (/\b(received|income|salary|dividend|refund|deposit|credited)\b/.test(lower)) {
+        tx_type = 'Income';
+      } else if (/\b(transfer|moved|shifted)\b/.test(lower)) {
         tx_type = 'Transfer';
       }
 
@@ -3031,7 +3049,7 @@
 
       let from_account = null;
       let to_account = null;
-      if (tx_type === 'Deposit') {
+      if (tx_type === 'Income') {
         from_account = bestMatch(opts.income);
         to_account = bestMatch(opts.bank_cash);
       } else if (tx_type === 'Transfer') {

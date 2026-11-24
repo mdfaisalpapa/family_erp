@@ -34,12 +34,12 @@
    "reqd": 1
   },
   {
-   "default": "Withdrawal",
+   "default": "Expense",
    "fieldname": "tx_type",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Transaction Type",
-   "options": "Withdrawal\nDeposit\nTransfer\nFamily",
+   "options": "Expense\nIncome\nTransfer\nFamily",
    "reqd": 1
   },
   {

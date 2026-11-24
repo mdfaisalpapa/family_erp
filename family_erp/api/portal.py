@@ -68,6 +68,15 @@ def _parse_csv_list(raw, split_newlines=False):
 	return seen
 
 
+def _normalize_tx_type(tx_type):
+	val = (tx_type or "").strip()
+	if val == "Withdrawal":
+		return "Expense"
+	if val == "Deposit":
+		return "Income"
+	return val
+
+
 def _classify_account_group(acc):
 	acc_type = acc.get("account_type") or ""
 	acc_name = acc.get("account_name") or ""
@@ -112,15 +121,15 @@ def _infer_je_details(je, jea_rows, attachments_count):
 	credit_liquid = bool(credits) and all(_is_liquid_account(r) for r in credits)
 
 	if "Expense" in debit_roots:
-		inferred_type = "Withdrawal"
+		inferred_type = "Expense"
 	elif "Income" in credit_roots:
-		inferred_type = "Deposit"
+		inferred_type = "Income"
 	elif debit_liquid and credit_liquid:
 		inferred_type = "Transfer"
 	elif credit_liquid and not debit_liquid:
-		inferred_type = "Withdrawal"
+		inferred_type = "Expense"
 	elif debit_liquid and not credit_liquid:
-		inferred_type = "Deposit"
+		inferred_type = "Income"
 	else:
 		inferred_type = "Transfer"
 
@@ -496,7 +505,7 @@ def get_transactions(search="", account="", tx_type="", tag="", from_date=None, 
 	offset = max(cint(offset) or 0, 0)
 	search = (search or "").strip()
 	account = (account or "").strip()
-	tx_type = (tx_type or "").strip()
+	tx_type = _normalize_tx_type(tx_type)
 	tag = (tag or "").strip()
 
 	conds = ["je.company = %(company)s", "je.docstatus = 1"]
@@ -683,8 +692,8 @@ def create_transaction(
 	if not can_write:
 		frappe.throw(_("You do not have write permission on this portal."), frappe.PermissionError)
 
-	tx_type = (tx_type or "").strip()
-	if tx_type not in ("Withdrawal", "Deposit", "Transfer", "Family"):
+	tx_type = _normalize_tx_type(tx_type)
+	if tx_type not in ("Expense", "Income", "Transfer", "Family"):
 		frappe.throw(_("Invalid transaction type: {0}").format(tx_type))
 
 	amt = flt(amount)
@@ -743,7 +752,7 @@ def create_transaction(
 	if from_account == to_account:
 		frappe.throw(_("From Account and To Account cannot be the same."))
 
-	if tx_type == "Withdrawal" and to_acc_doc.root_type == "Expense":
+	if tx_type == "Expense" and to_acc_doc.root_type == "Expense":
 		qe = frappe.new_doc("Quick Expense")
 		qe.posting_date = posting_date
 		qe.company = company
@@ -876,6 +885,7 @@ def delete_transaction(voucher_no):
 
 def _serialize_template(row):
 	d = dict(row)
+	d["tx_type"] = _normalize_tx_type(d.get("tx_type") or "Expense")
 	d["default_amount"] = flt(d.get("default_amount"), 2)
 	d["tags_list"] = _parse_csv_list(d.get("default_tags"))
 	d["aliases_list"] = _parse_csv_list(d.get("audio_aliases"), split_newlines=True)
@@ -934,8 +944,8 @@ def save_template(
 	if not template_name:
 		frappe.throw(_("Template Name is required."))
 
-	tx_type = (tx_type or "Withdrawal").strip()
-	if tx_type not in ("Withdrawal", "Deposit", "Transfer", "Family"):
+	tx_type = _normalize_tx_type(tx_type or "Expense")
+	if tx_type not in ("Expense", "Income", "Transfer", "Family"):
 		frappe.throw(_("Invalid transaction type: {0}").format(tx_type))
 
 	if from_account:
