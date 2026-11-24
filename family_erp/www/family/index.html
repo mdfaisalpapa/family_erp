@@ -232,9 +232,44 @@
     /* Tabs Navigation */
     .tabs-nav {
       display: flex;
+      flex-wrap: wrap;
       gap: 0.5rem;
       border-bottom: 2px solid var(--border-color);
       margin-bottom: 1.5rem;
+    }
+
+    .alert-banner {
+      padding: 0.85rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      border: 1px solid transparent;
+    }
+    .alert-warning {
+      background: var(--warning-bg);
+      color: var(--warning-text);
+      border-color: #fde68a;
+    }
+    .alert-info {
+      background: #eff6ff;
+      color: #1e40af;
+      border-color: #bfdbfe;
+    }
+    .section-heading {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 1.25rem 0 0.6rem;
+    }
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 1.25rem;
+    }
+    @media (max-width: 520px) {
+      .report-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .tab-btn {
@@ -554,7 +589,7 @@
           Print Statement
         </button>
 
-        <a href="/?cmd=web_logout" class="btn btn-danger-outline">Logout</a>
+        <button type="button" class="btn btn-danger-outline" onclick="doLogout()">Logout</button>
       </div>
     </header>
 
@@ -581,6 +616,8 @@
     <!-- Tabs Navigation -->
     <nav class="tabs-nav">
       <button class="tab-btn active" onclick="showTab('statement', this)">Statement of Account</button>
+      <button class="tab-btn" onclick="showTab('balance-sheet', this)">Balance Sheet</button>
+      <button class="tab-btn" onclick="showTab('income-expense', this)">Income &amp; Expenditure</button>
       <button class="tab-btn" onclick="showTab('properties', this)">My Properties &amp; Utilities ({{ properties_count }})</button>
     </nav>
 
@@ -596,12 +633,29 @@
           {% if is_admin_preview %}
           <input type="hidden" name="company" value="{{ selected_company }}">
           {% endif %}
+          {% if is_gl_mode %}
+          <select name="account" id="gl_account_select" class="company-select" onchange="this.form.submit()" style="max-width: 280px;">
+            <option value="ALL_BANK_CASH" {% if selected_account == "ALL_BANK_CASH" %}selected{% endif %}>All Bank &amp; Cash</option>
+            <option value="ALL_ACCOUNTS" {% if selected_account == "ALL_ACCOUNTS" %}selected{% endif %}>All Accounts</option>
+            {% for acc in gl_accounts %}
+            <option value="{{ acc.name }}" {% if acc.name == selected_account %}selected{% endif %}>{{ acc.account_name }} ({{ acc.root_type }})</option>
+            {% endfor %}
+          </select>
+          {% endif %}
           <input type="date" name="from_date" id="from_date" value="{{ from_date }}" class="date-input">
           <span style="color: var(--text-muted);">&ndash;</span>
           <input type="date" name="to_date" id="to_date" value="{{ to_date }}" class="date-input">
           <button type="submit" class="btn btn-primary">Apply</button>
         </form>
       </div>
+
+      {% if statement_error %}
+      <div class="alert-banner alert-warning">{{ statement_error }}</div>
+      {% endif %}
+
+      {% if gl_truncated_note %}
+      <div class="alert-banner alert-info">{{ gl_truncated_note }}</div>
+      {% endif %}
 
       <div class="table-container">
         <table class="statement-table">
@@ -643,6 +697,241 @@
             </tr>
           </tfoot>
         </table>
+      </div>
+    </div>
+
+    <!-- Tab: Balance Sheet -->
+    <div id="tab-balance-sheet" class="tab-content">
+      <section class="balance-card" style="margin-bottom: 1.25rem;">
+        <div class="balance-info">
+          <span class="badge-status badge-credit">Balance Sheet</span>
+          <div class="balance-amount">{{ bs_net_worth_formatted }}</div>
+          <p class="balance-subtext">Net Worth (Assets &minus; Liabilities) as of {{ to_date }}</p>
+        </div>
+        <div class="stats-counters">
+          <div class="counter-item">
+            <div class="counter-value" style="font-size: 1.15rem;">{{ bs_total_assets_formatted }}</div>
+            <div class="counter-label">Total Assets</div>
+          </div>
+          <div class="counter-item">
+            <div class="counter-value" style="font-size: 1.15rem; color: var(--danger-text);">{{ bs_total_liabilities_formatted }}</div>
+            <div class="counter-label">Total Liabilities</div>
+          </div>
+          {% if bs_equity %}
+          <div class="counter-item">
+            <div class="counter-value" style="font-size: 1.15rem;">{{ bs_total_equity_formatted }}</div>
+            <div class="counter-label">Equity</div>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <div class="report-grid">
+        <div>
+          <h3 class="section-heading">Assets</h3>
+          <div class="table-container">
+            <table class="statement-table">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th class="num" style="width: 150px;">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in bs_assets %}
+                <tr>
+                  <td>
+                    <div style="font-weight: 500;">{{ row.account_name }}</div>
+                    {% if row.parent_account %}
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
+                    {% endif %}
+                  </td>
+                  <td class="num" style="font-weight: 600;">{{ row.balance_formatted }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="2" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No asset balances recorded as of {{ to_date }}.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="row-total">
+                  <td>Total Assets</td>
+                  <td class="num">{{ bs_total_assets_formatted }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="section-heading">Liabilities</h3>
+          <div class="table-container">
+            <table class="statement-table">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th class="num" style="width: 150px;">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in bs_liabilities %}
+                <tr>
+                  <td>
+                    <div style="font-weight: 500;">{{ row.account_name }}</div>
+                    {% if row.parent_account %}
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
+                    {% endif %}
+                  </td>
+                  <td class="num" style="font-weight: 600;">{{ row.balance_formatted }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="2" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No liability balances recorded as of {{ to_date }}.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="row-total">
+                  <td>Total Liabilities</td>
+                  <td class="num">{{ bs_total_liabilities_formatted }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {% if bs_equity %}
+          <h3 class="section-heading">Equity</h3>
+          <div class="table-container">
+            <table class="statement-table">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th class="num" style="width: 150px;">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in bs_equity %}
+                <tr>
+                  <td>
+                    <div style="font-weight: 500;">{{ row.account_name }}</div>
+                    {% if row.parent_account %}
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
+                    {% endif %}
+                  </td>
+                  <td class="num" style="font-weight: 600;">{{ row.balance_formatted }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="row-total">
+                  <td>Total Equity</td>
+                  <td class="num">{{ bs_total_equity_formatted }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Income & Expenditure -->
+    <div id="tab-income-expense" class="tab-content">
+      <section class="balance-card" style="margin-bottom: 1.25rem;">
+        <div class="balance-info">
+          <span class="badge-status {% if ie_net_surplus >= 0 %}badge-credit{% else %}badge-payable{% endif %}">
+            {% if ie_net_surplus >= 0 %}Net Surplus{% else %}Net Deficit{% endif %}
+          </span>
+          <div class="balance-amount">{{ ie_net_surplus_formatted }}</div>
+          <p class="balance-subtext">Income &minus; Expenditure for {{ from_date }} to {{ to_date }}</p>
+        </div>
+        <div class="stats-counters">
+          <div class="counter-item">
+            <div class="counter-value" style="font-size: 1.15rem; color: var(--success-text);">{{ ie_total_income_formatted }}</div>
+            <div class="counter-label">Total Income</div>
+          </div>
+          <div class="counter-item">
+            <div class="counter-value" style="font-size: 1.15rem; color: var(--danger-text);">{{ ie_total_expense_formatted }}</div>
+            <div class="counter-label">Total Expenditure</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="report-grid">
+        <div>
+          <h3 class="section-heading">Income</h3>
+          <div class="table-container">
+            <table class="statement-table">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th class="num" style="width: 150px;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in ie_income %}
+                <tr>
+                  <td>
+                    <div style="font-weight: 500;">{{ row.account_name }}</div>
+                    {% if row.parent_account %}
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
+                    {% endif %}
+                  </td>
+                  <td class="num" style="font-weight: 600;">{{ row.amount_formatted }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="2" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No income recorded in this period.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="row-total">
+                  <td>Total Income</td>
+                  <td class="num">{{ ie_total_income_formatted }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="section-heading">Expenditure</h3>
+          <div class="table-container">
+            <table class="statement-table">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th class="num" style="width: 150px;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in ie_expense %}
+                <tr>
+                  <td>
+                    <div style="font-weight: 500;">{{ row.account_name }}</div>
+                    {% if row.parent_account %}
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
+                    {% endif %}
+                  </td>
+                  <td class="num" style="font-weight: 600;">{{ row.amount_formatted }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="2" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No expenditure recorded in this period.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="row-total">
+                  <td>Total Expenditure</td>
+                  <td class="num">{{ ie_total_expense_formatted }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -752,6 +1041,23 @@
       } else {
         alert("Copied: " + txt);
       }
+    }
+
+    async function doLogout() {
+      try {
+        const res = await fetch('/api/method/logout', {
+          method: 'POST',
+          headers: {
+            'X-Frappe-CSRF-Token': '{{ csrf_token }}'
+          },
+          credentials: 'same-origin'
+        });
+        if (res.ok) {
+          window.location.href = '/login';
+          return;
+        }
+      } catch (e) {}
+      window.location.href = '/login';
     }
   </script>
 </body>
