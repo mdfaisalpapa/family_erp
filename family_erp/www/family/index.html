@@ -936,6 +936,63 @@
         display: none !important;
       }
     }
+
+    /* Phase 2B: Templates, Tags, To-Do & Voice Assistant */
+    .tpl-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-bottom: 1rem;
+      align-items: center;
+    }
+    .tpl-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: var(--primary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .tpl-chip:hover { background: #dbeafe; }
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+    }
+    .tag-pill-todo {
+      background: #fef3c7;
+      color: #92400e;
+      border-color: #fde68a;
+    }
+    .voice-pulse {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #dc2626;
+      margin-right: 0.4rem;
+      animation: vpulse 1s infinite;
+    }
+    @keyframes vpulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.25); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @media print {
+      #tab-templates, #template-modal, #voice-modal { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -970,6 +1027,7 @@
         {% endif %}
 
         {% if can_write %}
+        <button type="button" onclick="openVoiceModal()" class="btn btn-outline desktop-only-btn" title="Voice Assistant">&#127908; Voice</button>
         <button type="button" onclick="openTxModal()" class="btn btn-primary desktop-only-btn">+ New Transaction</button>
         {% endif %}
 
@@ -1009,6 +1067,7 @@
       <button class="tab-btn" data-tab="statement" onclick="showTab('statement', this)">Statement of Account</button>
       <button class="tab-btn" data-tab="balance-sheet" onclick="showTab('balance-sheet', this)">Balance Sheet</button>
       <button class="tab-btn" data-tab="income-expense" onclick="showTab('income-expense', this)">Income &amp; Expenditure</button>
+      <button class="tab-btn" data-tab="templates" onclick="showTab('templates', this)">Templates &amp; Tags</button>
       <button class="tab-btn" data-tab="properties" onclick="showTab('properties', this)">My Properties &amp; Utilities ({{ properties_count }})</button>
     </nav>
 
@@ -1062,10 +1121,33 @@
           </div>
         </div>
       </div>
+
+      <div class="dash-grid">
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">To-Do Transactions</h3>
+          </div>
+          <div class="acct-list" id="dash-todo-list">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Loading...</div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">Tag Totals</h3>
+          </div>
+          <div class="cat-list" id="dash-tag-totals">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Loading...</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Tab: Transactions -->
     <div id="tab-transactions" class="tab-content">
+      {% if can_write %}
+      <div class="tpl-bar" id="tx-template-bar"></div>
+      {% endif %}
       <div class="filter-toolbar">
         <div class="pill-group" id="tx-type-pills">
           <button type="button" class="pill-btn active" onclick="setTxTypeFilter('', this)">All</button>
@@ -1074,7 +1156,10 @@
           <button type="button" class="pill-btn" onclick="setTxTypeFilter('Transfer', this)">Transfer</button>
         </div>
         <div class="date-filter-form">
-          <input type="search" id="tx-search" class="date-input" placeholder="Search description, account, JV..." oninput="debouncedLoadTransactions()" style="min-width: 220px;">
+          <select id="tx-tag-filter" class="company-select" onchange="loadTransactions(false)" style="max-width: 170px;">
+            <option value="">All Tags</option>
+          </select>
+          <input type="search" id="tx-search" class="date-input" placeholder="Search description, account, JV..." oninput="debouncedLoadTransactions()" style="min-width: 200px;">
         </div>
       </div>
 
@@ -1084,6 +1169,44 @@
 
       <div style="text-align: center; margin-top: 1rem;">
         <button type="button" id="tx-load-more" class="btn btn-outline" style="display: none;" onclick="loadTransactions(true)">Load More</button>
+      </div>
+    </div>
+
+    <!-- Tab: Templates & Tags -->
+    <div id="tab-templates" class="tab-content">
+      <div class="dash-grid">
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">Transaction Templates</h3>
+            {% if can_write %}
+            <button type="button" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" onclick="openTemplateModal()">+ New Template</button>
+            {% endif %}
+          </div>
+          <div class="acct-list" id="templates-list" style="max-height: 520px;">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Loading templates...</div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <h3 class="panel-title">Tags &amp; To-Do Rules</h3>
+          </div>
+          {% if can_write %}
+          <form id="tag-save-form" onsubmit="submitTagForm(event)" style="display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin-bottom: 0.9rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
+            <input type="hidden" id="tag-edit-name" value="">
+            <input type="text" id="tag-input-name" class="date-input" placeholder="Tag name (e.g. Groceries, To-Pay)" required style="flex: 1 1 140px;">
+            <input type="color" id="tag-input-color" value="#2563eb" title="Tag color" style="width: 38px; height: 34px; border: 1px solid var(--border-color); border-radius: 6px; padding: 2px; cursor: pointer;">
+            <label style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;">
+              <input type="checkbox" id="tag-input-todo"> To-Do
+            </label>
+            <button type="submit" id="tag-save-btn" class="btn btn-primary" style="padding: 0.38rem 0.75rem; font-size: 0.8rem;">Add Tag</button>
+            <button type="button" id="tag-cancel-edit" class="btn btn-outline" style="display: none; padding: 0.38rem 0.65rem; font-size: 0.8rem;" onclick="resetTagForm()">Cancel</button>
+          </form>
+          {% endif %}
+          <div class="acct-list" id="tags-list" style="max-height: 460px;">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Loading tags...</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1482,13 +1605,14 @@
 
   <!-- Mobile Sticky Bottom Navigation -->
   <nav class="mobile-bottom-nav">
-    <button type="button" class="mobile-nav-btn active" data-tab="dashboard" onclick="showTab('dashboard')">Dashboard</button>
+    <button type="button" class="mobile-nav-btn active" data-tab="dashboard" onclick="showTab('dashboard')">Dash</button>
     <button type="button" class="mobile-nav-btn" data-tab="transactions" onclick="showTab('transactions')">Txns</button>
     {% if can_write %}
     <button type="button" class="mobile-fab" onclick="openTxModal()" title="New Transaction">+</button>
+    <button type="button" class="mobile-nav-btn" onclick="openVoiceModal()" title="Voice">&#127908;</button>
     {% endif %}
-    <button type="button" class="mobile-nav-btn" data-tab="statement" onclick="showTab('statement')">Statement</button>
-    <button type="button" class="mobile-nav-btn" data-tab="balance-sheet" onclick="showTab('balance-sheet')">Reports</button>
+    <button type="button" class="mobile-nav-btn" data-tab="templates" onclick="showTab('templates')">Templates</button>
+    <button type="button" class="mobile-nav-btn" data-tab="statement" onclick="showTab('statement')">Stmt</button>
   </nav>
 
   {% if can_write %}
@@ -1500,6 +1624,7 @@
         <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem;" onclick="closeTxModal()">&times;</button>
       </div>
 
+      <div class="tpl-bar" id="modal-template-bar" style="margin-bottom: 0.75rem;"></div>
       <form id="tx-create-form" onsubmit="submitTransaction(event)">
         <div class="form-field">
           <label>Transaction Type</label>
@@ -1560,11 +1685,109 @@
           <input type="text" id="tx-description" class="form-control" placeholder="Notes / merchant / purpose">
         </div>
 
+        <div class="form-field">
+          <label for="tx-tags-input">Tags (comma-separated)</label>
+          <input type="text" id="tx-tags-input" class="form-control" placeholder="e.g. Groceries, To-Pay">
+          <div class="chip-row" id="modal-tag-chips"></div>
+        </div>
+
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem;">
           <button type="button" class="btn btn-outline" onclick="closeTxModal()">Cancel</button>
           <button type="submit" id="tx-submit-btn" class="btn btn-primary">Save Transaction</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Template Create/Edit Modal -->
+  <div id="template-modal" class="modal-backdrop" onclick="if(event.target===this) closeTemplateModal()">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="tpl-modal-title" style="margin: 0; font-size: 1.1rem; font-weight: 700;">New Template</h3>
+        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem;" onclick="closeTemplateModal()">&times;</button>
+      </div>
+      <form id="tpl-save-form" onsubmit="submitTemplateForm(event)">
+        <input type="hidden" id="tpl-edit-name" value="">
+        <div class="form-field">
+          <label for="tpl-name">Template Name</label>
+          <input type="text" id="tpl-name" class="form-control" placeholder="e.g. Morning Milk, Salary, EB Bill" required>
+        </div>
+        <div class="form-field">
+          <label for="tpl-tx-type">Transaction Type</label>
+          <select id="tpl-tx-type" class="form-control" onchange="syncTemplateModalAccounts()">
+            <option value="Withdrawal">Withdrawal</option>
+            <option value="Deposit">Deposit</option>
+            <option value="Transfer">Transfer</option>
+            <option value="Family">Family</option>
+          </select>
+        </div>
+        <div id="tpl-family-fields" style="display: none;">
+          <div class="form-field">
+            <label for="tpl-family-company">Family Company</label>
+            <select id="tpl-family-company" class="form-control"></select>
+          </div>
+          <div class="form-field">
+            <label for="tpl-family-tx-type">Family Transaction Type</label>
+            <select id="tpl-family-tx-type" class="form-control">
+              <option value="Expense Paid on Behalf">Expense Paid on Behalf</option>
+              <option value="Settlement Received">Settlement Received</option>
+              <option value="Advance Given">Advance Given</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="tpl-from-account">From Account</label>
+          <select id="tpl-from-account" class="form-control"></select>
+        </div>
+        <div class="form-field" id="tpl-to-group">
+          <label for="tpl-to-account">To Account</label>
+          <select id="tpl-to-account" class="form-control"></select>
+        </div>
+        <div class="form-field">
+          <label for="tpl-amount">Default Amount</label>
+          <input type="number" step="0.01" min="0" id="tpl-amount" class="form-control" placeholder="0.00">
+        </div>
+        <div class="form-field">
+          <label for="tpl-description">Default Description</label>
+          <input type="text" id="tpl-description" class="form-control" placeholder="Default remark">
+        </div>
+        <div class="form-field">
+          <label for="tpl-tags">Default Tags (comma-separated)</label>
+          <input type="text" id="tpl-tags" class="form-control" placeholder="e.g. Utilities, Monthly">
+        </div>
+        <div class="form-field">
+          <label for="tpl-aliases">Voice / Audio Aliases (comma or newline separated)</label>
+          <textarea id="tpl-aliases" rows="2" class="form-control" placeholder="milk, dairy, morning groceries"></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem;">
+          <button type="button" class="btn btn-outline" onclick="closeTemplateModal()">Cancel</button>
+          <button type="submit" id="tpl-submit-btn" class="btn btn-primary">Save Template</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Voice Transaction Assistant Modal -->
+  <div id="voice-modal" class="modal-backdrop" onclick="if(event.target===this) closeVoiceModal()">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">&#127908; Voice Transaction Assistant</h3>
+        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem;" onclick="closeVoiceModal()">&times;</button>
+      </div>
+      <div id="voice-status" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        Click Start Listening or type a phrase (e.g. &ldquo;Paid 450 from SBI Faisal for groceries&rdquo;).
+      </div>
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 0.85rem;">
+        <button type="button" id="voice-mic-btn" class="btn btn-primary" onclick="toggleVoiceRecognition()">Start Listening</button>
+      </div>
+      <div class="form-field">
+        <label for="voice-manual-input">Spoken / Manual Phrase</label>
+        <textarea id="voice-manual-input" rows="2" class="form-control" placeholder="e.g. Spent 320 from Cash Saba on vegetables"></textarea>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
+        <button type="button" class="btn btn-outline" onclick="closeVoiceModal()">Close</button>
+        <button type="button" class="btn btn-primary" onclick="applyVoicePhrase()">Parse &amp; Fill Transaction</button>
+      </div>
     </div>
   </div>
   {% endif %}
@@ -1584,6 +1807,10 @@
     let txTypeFilter = '';
     let txSearchTimer = null;
     let modalTxType = 'Withdrawal';
+    let templatesCache = [];
+    let tagsCache = [];
+    let speechRec = null;
+    let isListening = false;
 
     function fmtInr(num) {
       const val = Number(num) || 0;
@@ -1767,6 +1994,8 @@
         renderTopCategories(data.top_categories || []);
         dashAccountsCache = data.accounts || [];
         filterDashboardAccounts();
+        renderTodoTransactions(data.todo_transactions || []);
+        renderTagTotals(data.tag_totals || []);
       } catch (e) {
         console.error('Dashboard load error', e);
       }
@@ -1861,9 +2090,11 @@
       if (!append) txOffset = 0;
       const search = document.getElementById('tx-search') ? document.getElementById('tx-search').value : '';
       try {
+        const tagFilter = document.getElementById('tx-tag-filter') ? document.getElementById('tx-tag-filter').value : '';
         const res = await fetch(apiUrl('get_transactions', {
           search: search,
           tx_type: txTypeFilter,
+          tag: tagFilter,
           limit: TX_LIMIT,
           offset: txOffset
         }), { credentials: 'same-origin' });
@@ -1890,6 +2121,7 @@
                 '</div>' +
                 '<div style="font-weight:600;font-size:0.9rem;">' + escHtml(tx.from_account_name) + ' &rarr; ' + escHtml(tx.to_account_name) + '</div>' +
                 (tx.description ? '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.15rem;">' + escHtml(tx.description) + '</div>' : '') +
+                renderTxTagPills(tx.name, tx.tags || []) +
               '</div>' +
               '<div style="display:flex;align-items:center;gap:0.75rem;">' +
                 '<div style="font-size:1.05rem;font-weight:800;">' + fmtInr(tx.amount) + '</div>' +
@@ -2010,6 +2242,9 @@
           '<option value="' + escHtml(f.family_company) + '">' + escHtml(f.family_company) + '</option>'
         ).join('');
       }
+      if (document.getElementById('tx-tags-input')) document.getElementById('tx-tags-input').value = '';
+      renderModalTagChips();
+      renderTemplateBars();
       setModalTxType('Withdrawal', document.querySelector('#modal-tx-type-pills .pill-btn[data-type="Withdrawal"]'));
     }
 
@@ -2038,6 +2273,7 @@
         description: document.getElementById('tx-description').value,
         family_company: modalTxType === 'Family' ? document.getElementById('tx-family-company').value : null,
         family_tx_type: modalTxType === 'Family' ? document.getElementById('tx-family-tx-type').value : null,
+        tags: document.getElementById('tx-tags-input') ? document.getElementById('tx-tags-input').value : '',
         company: PORTAL_COMPANY
       };
 
@@ -2072,11 +2308,551 @@
       }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    function renderTxTagPills(voucherNo, tags) {
+      if (!tags || !tags.length) return '';
+      const metaMap = {};
+      tagsCache.forEach(t => { metaMap[t.tag_name] = t; });
+      return '<div class="chip-row" style="margin-top:0.35rem;">' + tags.map(tag => {
+        const meta = metaMap[tag];
+        const isTodo = meta && meta.is_todo;
+        const cls = isTodo ? 'tag-pill tag-pill-todo' : 'tag-pill';
+        const rm = CAN_WRITE
+          ? ' <span style="cursor:pointer;margin-left:0.15rem;" onclick="toggleTxTag('' + escHtml(voucherNo) + '','' + escHtml(tag) + '','remove')">&times;</span>'
+          : '';
+        return '<span class="' + cls + '">' + escHtml(tag) + rm + '</span>';
+      }).join('') + '</div>';
+    }
+
+    function renderTodoTransactions(items) {
+      const el = document.getElementById('dash-todo-list');
+      if (!el) return;
+      if (!items.length) {
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No pending To-Do transactions.</div>';
+        return;
+      }
+      el.innerHTML = items.map(tx => {
+        const todoTag = (tx.tags || []).find(t => {
+          const m = tagsCache.find(tc => tc.tag_name === t);
+          return m && m.is_todo;
+        }) || (tx.tags && tx.tags[0]) || '';
+        const doneBtn = (CAN_WRITE && todoTag)
+          ? '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.55rem;font-size:0.75rem;" onclick="markTodoDone('' + escHtml(tx.name) + '','' + escHtml(todoTag) + '')">Done</button>'
+          : '';
+        return '<div class="acct-row">' +
+          '<div style="min-width:0;">' +
+            '<div style="font-weight:600;font-size:0.85rem;">' + escHtml(tx.from_account_name) + ' &rarr; ' + escHtml(tx.to_account_name) + '</div>' +
+            '<div style="font-size:0.75rem;color:var(--text-muted);">' + escHtml(tx.posting_date) + (tx.description ? ' &bull; ' + escHtml(tx.description) : '') + '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:0.5rem;">' +
+            '<strong>' + fmtInr(tx.amount) + '</strong>' + doneBtn +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderTagTotals(items) {
+      const el = document.getElementById('dash-tag-totals');
+      if (!el) return;
+      if (!items.length) {
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No tagged transactions in this period.</div>';
+        return;
+      }
+      const maxAmt = Math.max(...items.map(i => i.amount), 1);
+      el.innerHTML = items.map(i => {
+        const pct = Math.max(3, Math.round((i.amount / maxAmt) * 100));
+        const badge = i.is_todo ? ' <span class="tag-pill tag-pill-todo">To-Do</span>' : '';
+        return '<div>' +
+          '<div class="cat-row-top"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + escHtml(i.color || '#2563eb') + ';margin-right:0.35rem;"></span>' + escHtml(i.tag_name) + badge + ' (' + i.tx_count + ')</span><strong>' + fmtInr(i.amount) + '</strong></div>' +
+          '<div class="cat-track"><div class="cat-fill" style="width:' + pct + '%;background:' + escHtml(i.color || '#3b82f6') + ';"></div></div>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function markTodoDone(voucherNo, tagName) {
+      await toggleTxTag(voucherNo, tagName, 'remove');
+      loadDashboard();
+    }
+
+    async function toggleTxTag(voucherNo, tagName, action) {
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.toggle_transaction_tag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify({ voucher_no: voucherNo, tag_name: tagName, action: action || 'toggle', company: PORTAL_COMPANY })
+        });
+        if (!res.ok) { showToast('Failed to update tag', 'error'); return; }
+        showToast('Updated tag on ' + voucherNo, 'success');
+        loadTransactions(false);
+        loadDashboard();
+      } catch (e) {
+        showToast('Error updating tag', 'error');
+      }
+    }
+
+    async function loadTemplates() {
+      try {
+        const res = await fetch(apiUrl('get_templates'), { credentials: 'same-origin' });
+        const json = await res.json();
+        templatesCache = (json.message && json.message.items) ? json.message.items : [];
+        renderTemplateBars();
+        renderTemplatesTab();
+      } catch (e) { console.error('Templates load error', e); }
+    }
+
+    function renderTemplateBars() {
+      const chipsHtml = templatesCache.length
+        ? '<span style="font-size:0.75rem;font-weight:700;color:var(--text-muted);">Quick Templates:</span>' +
+          templatesCache.map(t =>
+            '<button type="button" class="tpl-chip" onclick="useTemplate('' + escHtml(t.name) + '')">' +
+              escHtml(t.template_name) + (t.default_amount > 0 ? ' (' + fmtInr(t.default_amount) + ')' : '') +
+            '</button>'
+          ).join('')
+        : '';
+      const bar1 = document.getElementById('tx-template-bar');
+      const bar2 = document.getElementById('modal-template-bar');
+      if (bar1) bar1.innerHTML = chipsHtml;
+      if (bar2) bar2.innerHTML = chipsHtml;
+    }
+
+    function renderTemplatesTab() {
+      const el = document.getElementById('templates-list');
+      if (!el) return;
+      if (!templatesCache.length) {
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No templates saved yet. Click + New Template to create one.</div>';
+        return;
+      }
+      el.innerHTML = templatesCache.map(t => {
+        const actions = CAN_WRITE
+          ? '<button type="button" class="btn btn-primary" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="useTemplate('' + escHtml(t.name) + '')">Use</button>' +
+            '<button type="button" class="btn btn-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="editTemplate('' + escHtml(t.name) + '')">Edit</button>' +
+            '<button type="button" class="btn btn-danger-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" onclick="deleteTemplate('' + escHtml(t.name) + '')">Delete</button>'
+          : '';
+        const tagsHtml = (t.tags_list || []).map(tg => '<span class="tag-pill">' + escHtml(tg) + '</span>').join(' ');
+        const aliasHtml = (t.aliases_list && t.aliases_list.length) ? '<div style="font-size:0.72rem;color:var(--text-muted);">Voice aliases: ' + escHtml(t.aliases_list.join(', ')) + '</div>' : '';
+        return '<div class="acct-row" style="flex-wrap:wrap;">' +
+          '<div style="flex:1 1 220px;">' +
+            '<div><strong>' + escHtml(t.template_name) + '</strong> <span class="tx-badge tx-badge-' + escHtml(t.tx_type) + '">' + escHtml(t.tx_type) + '</span>' +
+            (t.default_amount > 0 ? ' <strong>' + fmtInr(t.default_amount) + '</strong>' : '') + '</div>' +
+            '<div style="font-size:0.78rem;color:var(--text-muted);">' + escHtml(t.from_account || '-') + ' &rarr; ' + escHtml(t.to_account || t.family_company || '-') + '</div>' +
+            aliasHtml +
+            (tagsHtml ? '<div class="chip-row" style="margin-top:0.25rem;">' + tagsHtml + '</div>' : '') +
+          '</div>' +
+          '<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">' + actions + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function useTemplate(name) {
+      const t = templatesCache.find(x => x.name === name);
+      if (!t) return;
+      await openTxModal();
+      const pill = document.querySelector('#modal-tx-type-pills .pill-btn[data-type="' + t.tx_type + '"]');
+      setModalTxType(t.tx_type, pill);
+      if (t.default_amount > 0) {
+        document.getElementById('tx-amount-expr').value = String(t.default_amount);
+        updateAmountPreview();
+      }
+      if (t.from_account) document.getElementById('tx-from-account').value = t.from_account;
+      if (t.tx_type === 'Family' && t.family_company) {
+        document.getElementById('tx-family-company').value = t.family_company;
+        if (t.family_tx_type) document.getElementById('tx-family-tx-type').value = t.family_tx_type;
+      } else if (t.to_account) {
+        document.getElementById('tx-to-account').value = t.to_account;
+      }
+      if (t.description) document.getElementById('tx-description').value = t.description;
+      if (document.getElementById('tx-tags-input')) document.getElementById('tx-tags-input').value = t.default_tags || '';
+    }
+
+    async function syncTemplateModalAccounts() {
+      const opts = await ensureFormOptions();
+      const txType = document.getElementById('tpl-tx-type').value;
+      const famBox = document.getElementById('tpl-family-fields');
+      const toGroup = document.getElementById('tpl-to-group');
+      const fromSel = document.getElementById('tpl-from-account');
+      const toSel = document.getElementById('tpl-to-account');
+      const famSel = document.getElementById('tpl-family-company');
+      if (famSel && opts.family_companies) {
+        famSel.innerHTML = opts.family_companies.map(f => '<option value="' + escHtml(f.family_company) + '">' + escHtml(f.family_company) + '</option>').join('');
+      }
+      if (txType === 'Family') {
+        famBox.style.display = 'block';
+        toGroup.style.display = 'none';
+        fillSelect(fromSel, opts.bank_cash, true);
+      } else {
+        famBox.style.display = 'none';
+        toGroup.style.display = 'block';
+        const all = opts.bank_cash.concat(opts.expense, opts.income, opts.other_assets_liabilities);
+        fillSelect(fromSel, all, true);
+        fillSelect(toSel, all, true);
+      }
+    }
+
+    async function openTemplateModal() {
+      document.getElementById('tpl-modal-title').textContent = 'New Template';
+      document.getElementById('tpl-edit-name').value = '';
+      document.getElementById('tpl-name').value = '';
+      document.getElementById('tpl-tx-type').value = 'Withdrawal';
+      document.getElementById('tpl-amount').value = '';
+      document.getElementById('tpl-description').value = '';
+      document.getElementById('tpl-tags').value = '';
+      document.getElementById('tpl-aliases').value = '';
+      await syncTemplateModalAccounts();
+      document.getElementById('template-modal').classList.add('open');
+    }
+
+    async function editTemplate(name) {
+      const t = templatesCache.find(x => x.name === name);
+      if (!t) return;
+      document.getElementById('tpl-modal-title').textContent = 'Edit Template';
+      document.getElementById('tpl-edit-name').value = t.name;
+      document.getElementById('tpl-name').value = t.template_name || '';
+      document.getElementById('tpl-tx-type').value = t.tx_type || 'Withdrawal';
+      await syncTemplateModalAccounts();
+      if (t.from_account) document.getElementById('tpl-from-account').value = t.from_account;
+      if (t.to_account) document.getElementById('tpl-to-account').value = t.to_account;
+      if (t.family_company) document.getElementById('tpl-family-company').value = t.family_company;
+      if (t.family_tx_type) document.getElementById('tpl-family-tx-type').value = t.family_tx_type;
+      document.getElementById('tpl-amount').value = t.default_amount || '';
+      document.getElementById('tpl-description').value = t.description || '';
+      document.getElementById('tpl-tags').value = t.default_tags || '';
+      document.getElementById('tpl-aliases').value = t.audio_aliases || '';
+      document.getElementById('template-modal').classList.add('open');
+    }
+
+    function closeTemplateModal() {
+      const el = document.getElementById('template-modal');
+      if (el) el.classList.remove('open');
+    }
+
+    async function submitTemplateForm(e) {
+      e.preventDefault();
+      const txType = document.getElementById('tpl-tx-type').value;
+      const payload = {
+        name: document.getElementById('tpl-edit-name').value || null,
+        template_name: document.getElementById('tpl-name').value,
+        tx_type: txType,
+        from_account: document.getElementById('tpl-from-account').value || null,
+        to_account: txType === 'Family' ? null : (document.getElementById('tpl-to-account').value || null),
+        family_company: txType === 'Family' ? document.getElementById('tpl-family-company').value : null,
+        family_tx_type: txType === 'Family' ? document.getElementById('tpl-family-tx-type').value : null,
+        default_amount: Number(document.getElementById('tpl-amount').value || 0),
+        description: document.getElementById('tpl-description').value,
+        default_tags: document.getElementById('tpl-tags').value,
+        audio_aliases: document.getElementById('tpl-aliases').value,
+        company: PORTAL_COMPANY
+      };
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.save_template', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (!res.ok || json.exc) { showToast('Error saving template', 'error'); return; }
+        showToast('Template saved', 'success');
+        closeTemplateModal();
+        loadTemplates();
+      } catch (err) { showToast('Network error saving template', 'error'); }
+    }
+
+    async function deleteTemplate(name) {
+      if (!confirm('Delete this template?')) return;
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.delete_template', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify({ name: name, company: PORTAL_COMPANY })
+        });
+        if (!res.ok) { showToast('Failed to delete template', 'error'); return; }
+        showToast('Template deleted', 'success');
+        loadTemplates();
+      } catch (e) { showToast('Error deleting template', 'error'); }
+    }
+
+    async function loadTags() {
+      try {
+        const res = await fetch(apiUrl('get_tags'), { credentials: 'same-origin' });
+        const json = await res.json();
+        tagsCache = (json.message && json.message.items) ? json.message.items : [];
+        renderTagsTab();
+        renderTagFilterDropdown();
+        renderModalTagChips();
+      } catch (e) { console.error('Tags load error', e); }
+    }
+
+    function renderTagFilterDropdown() {
+      const sel = document.getElementById('tx-tag-filter');
+      if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">All Tags</option>' +
+        tagsCache.map(t => '<option value="' + escHtml(t.tag_name) + '">' + escHtml(t.tag_name) + (t.is_todo ? ' (To-Do)' : '') + '</option>').join('');
+      sel.value = cur;
+    }
+
+    function renderModalTagChips() {
+      const el = document.getElementById('modal-tag-chips');
+      if (!el) return;
+      el.innerHTML = tagsCache.map(t =>
+        '<button type="button" class="chip-btn" onclick="appendModalTag('' + escHtml(t.tag_name) + '')">+ ' + escHtml(t.tag_name) + '</button>'
+      ).join('');
+    }
+
+    function appendModalTag(tagName) {
+      const inp = document.getElementById('tx-tags-input');
+      if (!inp) return;
+      const existing = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+      if (!existing.includes(tagName)) existing.push(tagName);
+      inp.value = existing.join(', ');
+    }
+
+    function renderTagsTab() {
+      const el = document.getElementById('tags-list');
+      if (!el) return;
+      if (!tagsCache.length) {
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No tags defined yet.</div>';
+        return;
+      }
+      el.innerHTML = tagsCache.map(t => {
+        const todoBadge = t.is_todo ? ' <span class="tag-pill tag-pill-todo">To-Do</span>' : '';
+        const actions = CAN_WRITE
+          ? '<button type="button" class="btn btn-outline" style="padding:0.2rem 0.5rem;font-size:0.75rem;" onclick="editTag('' + escHtml(t.name) + '')">Edit</button>' +
+            '<button type="button" class="btn btn-danger-outline" style="padding:0.2rem 0.5rem;font-size:0.75rem;" onclick="deleteTag('' + escHtml(t.name) + '')">Delete</button>'
+          : '';
+        return '<div class="acct-row">' +
+          '<div><span class="tag-pill" style="border-color:' + escHtml(t.color) + ';"><span style="width:8px;height:8px;border-radius:50%;background:' + escHtml(t.color) + ';display:inline-block;"></span> ' + escHtml(t.tag_name) + '</span>' + todoBadge + '</div>' +
+          '<div style="display:flex;gap:0.35rem;">' + actions + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function editTag(name) {
+      const t = tagsCache.find(x => x.name === name);
+      if (!t) return;
+      document.getElementById('tag-edit-name').value = t.name;
+      document.getElementById('tag-input-name').value = t.tag_name;
+      document.getElementById('tag-input-color').value = t.color || '#2563eb';
+      document.getElementById('tag-input-todo').checked = !!t.is_todo;
+      document.getElementById('tag-save-btn').textContent = 'Update';
+      document.getElementById('tag-cancel-edit').style.display = 'inline-flex';
+    }
+
+    function resetTagForm() {
+      document.getElementById('tag-edit-name').value = '';
+      document.getElementById('tag-input-name').value = '';
+      document.getElementById('tag-input-color').value = '#2563eb';
+      document.getElementById('tag-input-todo').checked = false;
+      document.getElementById('tag-save-btn').textContent = 'Add Tag';
+      document.getElementById('tag-cancel-edit').style.display = 'none';
+    }
+
+    async function submitTagForm(e) {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('tag-edit-name').value || null,
+        tag_name: document.getElementById('tag-input-name').value,
+        color: document.getElementById('tag-input-color').value,
+        is_todo: document.getElementById('tag-input-todo').checked ? 1 : 0,
+        company: PORTAL_COMPANY
+      };
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.save_tag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (!res.ok || json.exc) { showToast('Failed to save tag', 'error'); return; }
+        showToast('Tag saved', 'success');
+        resetTagForm();
+        await loadTags();
+        loadDashboard();
+      } catch (err) { showToast('Error saving tag', 'error'); }
+    }
+
+    async function deleteTag(name) {
+      if (!confirm('Delete this tag rule?')) return;
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.delete_tag', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify({ name: name, company: PORTAL_COMPANY })
+        });
+        if (!res.ok) { showToast('Failed to delete tag', 'error'); return; }
+        showToast('Tag deleted', 'success');
+        await loadTags();
+        loadDashboard();
+      } catch (e) { showToast('Error deleting tag', 'error'); }
+    }
+
+    /* Web Speech API Voice Assistant */
+    function openVoiceModal() {
+      const m = document.getElementById('voice-modal');
+      if (!m) return;
+      document.getElementById('voice-manual-input').value = '';
+      document.getElementById('voice-status').innerHTML = 'Click Start Listening or type a phrase (e.g. &ldquo;Paid 450 from SBI Faisal for groceries&rdquo;).';
+      m.classList.add('open');
+    }
+
+    function closeVoiceModal() {
+      if (speechRec && isListening) {
+        try { speechRec.stop(); } catch (_) {}
+      }
+      isListening = false;
+      const m = document.getElementById('voice-modal');
+      if (m) m.classList.remove('open');
+    }
+
+    function toggleVoiceRecognition() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const statusEl = document.getElementById('voice-status');
+      const btn = document.getElementById('voice-mic-btn');
+      if (!SR) {
+        statusEl.textContent = 'Web Speech API not supported in this browser. Type your phrase below.';
+        return;
+      }
+      if (isListening && speechRec) {
+        speechRec.stop();
+        return;
+      }
+      speechRec = new SR();
+      speechRec.lang = 'en-IN';
+      speechRec.interimResults = true;
+      speechRec.continuous = false;
+      isListening = true;
+      btn.textContent = 'Stop Listening';
+      statusEl.innerHTML = '<span class="voice-pulse"></span> Listening (en-IN)...';
+
+      speechRec.onresult = (ev) => {
+        let transcript = '';
+        for (let i = 0; i < ev.results.length; i++) {
+          transcript += ev.results[i][0].transcript + ' ';
+        }
+        document.getElementById('voice-manual-input').value = transcript.trim();
+      };
+      speechRec.onerror = (ev) => {
+        statusEl.textContent = 'Speech error: ' + ev.error + '. You can type manually below.';
+      };
+      speechRec.onend = () => {
+        isListening = false;
+        btn.textContent = 'Start Listening';
+        statusEl.textContent = 'Captured phrase ready. Click Parse & Fill Transaction.';
+      };
+      speechRec.start();
+    }
+
+    function scoreAccountMatch(phraseLower, accountName) {
+      const words = (accountName || '').toLowerCase().split(/[\s\-:()/]+/).filter(w => w.length >= 3);
+      let score = 0;
+      words.forEach(w => { if (phraseLower.includes(w)) score += w.length; });
+      return score;
+    }
+
+    function parseVoiceCommand(text) {
+      const raw = (text || '').trim();
+      const lower = raw.toLowerCase();
+      const amtMatch = raw.replace(/,/g, '').match(/(\d+(?:\.\d{1,2})?)/);
+      const amount = amtMatch ? parseFloat(amtMatch[1]) : 0;
+
+      // 1. Match loaded templates (template_name or aliases_list)
+      let matchedTemplate = null;
+      for (const tpl of templatesCache) {
+        const candidates = [tpl.template_name].concat(tpl.aliases_list || []).filter(Boolean);
+        if (candidates.some(c => lower.includes(c.toLowerCase()))) {
+          matchedTemplate = tpl;
+          break;
+        }
+      }
+
+      if (matchedTemplate) {
+        return {
+          template: matchedTemplate,
+          tx_type: matchedTemplate.tx_type,
+          amount: amount || matchedTemplate.default_amount || 0,
+          from_account: matchedTemplate.from_account,
+          to_account: matchedTemplate.to_account,
+          family_company: matchedTemplate.family_company,
+          family_tx_type: matchedTemplate.family_tx_type,
+          tags: matchedTemplate.default_tags || '',
+          description: raw || matchedTemplate.description || ''
+        };
+      }
+
+      // 2. Infer tx_type
+      let tx_type = 'Withdrawal';
+      if (/(received|income|salary|dividend|refund|deposit|credited)/.test(lower)) {
+        tx_type = 'Deposit';
+      } else if (/(transfer|moved|shifted)/.test(lower)) {
+        tx_type = 'Transfer';
+      }
+
+      // 3. Match spoken words against formOptions accounts
+      const opts = formOptionsCache || { bank_cash: [], expense: [], income: [] };
+      const bestMatch = (list) => {
+        let best = null;
+        let bestScore = 0;
+        (list || []).forEach(a => {
+          const sc = scoreAccountMatch(lower, a.account_name);
+          if (sc > bestScore) { bestScore = sc; best = a.name; }
+        });
+        return best;
+      };
+
+      let from_account = null;
+      let to_account = null;
+      if (tx_type === 'Deposit') {
+        from_account = bestMatch(opts.income);
+        to_account = bestMatch(opts.bank_cash);
+      } else if (tx_type === 'Transfer') {
+        from_account = bestMatch(opts.bank_cash);
+        const remaining = (opts.bank_cash || []).filter(a => a.name !== from_account);
+        to_account = bestMatch(remaining);
+      } else {
+        from_account = bestMatch(opts.bank_cash);
+        to_account = bestMatch(opts.expense);
+      }
+
+      return { tx_type, amount, from_account, to_account, tags: '', description: raw };
+    }
+
+    async function applyVoicePhrase() {
+      const phrase = document.getElementById('voice-manual-input').value.trim();
+      if (!phrase) { showToast('Enter or speak a transaction phrase first', 'error'); return; }
+      await ensureFormOptions();
+      const parsed = parseVoiceCommand(phrase);
+      closeVoiceModal();
+      await openTxModal();
+      const pill = document.querySelector('#modal-tx-type-pills .pill-btn[data-type="' + parsed.tx_type + '"]');
+      setModalTxType(parsed.tx_type, pill);
+      if (parsed.amount > 0) {
+        document.getElementById('tx-amount-expr').value = String(parsed.amount);
+        updateAmountPreview();
+      }
+      if (parsed.from_account) document.getElementById('tx-from-account').value = parsed.from_account;
+      if (parsed.tx_type === 'Family' && parsed.family_company) {
+        document.getElementById('tx-family-company').value = parsed.family_company;
+        if (parsed.family_tx_type) document.getElementById('tx-family-tx-type').value = parsed.family_tx_type;
+      } else if (parsed.to_account) {
+        document.getElementById('tx-to-account').value = parsed.to_account;
+      }
+      document.getElementById('tx-description').value = parsed.description || '';
+      if (document.getElementById('tx-tags-input') && parsed.tags) {
+        document.getElementById('tx-tags-input').value = parsed.tags;
+      }
+      showToast('Voice command parsed—review and save', 'success');
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
       const qs = new URLSearchParams(window.location.search);
       if (qs.has('account') || qs.has('from_date') || qs.has('to_date')) {
         showTab('statement');
       }
+      await loadTags();
+      loadTemplates();
       loadDashboard();
       loadTransactions(false);
     });
