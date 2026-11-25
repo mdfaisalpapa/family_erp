@@ -1799,6 +1799,29 @@
 
     <!-- Tab: Transactions -->
     <div id="tab-transactions" class="tab-content">
+      <div class="panel-card" id="tx-monthly-trend-card" style="margin-bottom: 1.15rem;">
+        <div class="panel-header" style="flex-wrap: wrap;">
+          <h3 class="panel-title">12-Month Cash Flow (Income, Expenditure &amp; Surplus)</h3>
+          <div class="trend-legend">
+            <span class="trend-legend-item"><span class="trend-dot" style="background:#059669;"></span>Income</span>
+            <span class="trend-legend-item"><span class="trend-dot" style="background:#e11d48;"></span>Expenditure</span>
+            <span class="trend-legend-item"><span class="trend-dot" style="background:#1e3a8a;"></span>Surplus</span>
+            <span class="trend-legend-item"><span class="trend-dot" style="background:#d97706;"></span>Deficit</span>
+          </div>
+        </div>
+        <div class="trend-detail-strip" id="tx-trend-detail-strip">
+          <strong id="tx-trend-det-month">-</strong>
+          <div class="trend-detail-metrics">
+            <button type="button" class="trend-metric-btn" id="tx-trend-btn-inc" data-month="" data-tx-type="Income" onclick="drillDownMonthTransactions(this.dataset.month, this.dataset.txType)">Income: <strong id="tx-trend-det-inc" style="color: var(--success-text);">-</strong></button>
+            <button type="button" class="trend-metric-btn" id="tx-trend-btn-exp" data-month="" data-tx-type="Expense" onclick="drillDownMonthTransactions(this.dataset.month, this.dataset.txType)">Expenditure: <strong id="tx-trend-det-exp" style="color: var(--danger-text);">-</strong></button>
+            <button type="button" class="trend-metric-btn" id="tx-trend-btn-surp" data-month="" data-tx-type="" onclick="drillDownMonthTransactions(this.dataset.month, this.dataset.txType)"><span id="tx-trend-det-surp-lbl">Surplus</span>: <strong id="tx-trend-det-surp">-</strong></button>
+          </div>
+        </div>
+        <div id="tx-monthly-trend">
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Loading 12-month trend...</div>
+        </div>
+        <div class="trend-hint">Tap any bar or figure to filter that month&rsquo;s transactions</div>
+      </div>
       {% if can_write %}
       <div class="tpl-bar" id="tx-template-bar"></div>
       {% endif %}
@@ -2779,6 +2802,9 @@
       if (subId) {
         showSubTab(primaryId, subId);
       }
+      if (primaryId === 'transactions' && !monthlyTrendCache.length) {
+        loadDashboard();
+      }
     }
 
     function switchCompany(comp) {
@@ -2950,21 +2976,28 @@
       if (isNaN(idx) || !monthlyTrendCache[idx]) return;
       selectedTrendIdx = idx;
       const item = monthlyTrendCache[idx];
-      document.getElementById('trend-det-month').textContent = item.label;
-      document.getElementById('trend-det-inc').textContent = fmtInr(item.income);
-      document.getElementById('trend-det-exp').textContent = fmtInr(item.expense);
-      const surpLbl = document.getElementById('trend-det-surp-lbl');
-      const surpEl = document.getElementById('trend-det-surp');
-      surpLbl.textContent = item.surplus >= 0 ? 'Surplus' : 'Deficit';
-      surpEl.textContent = fmtInr(item.surplus);
-      surpEl.style.color = item.surplus >= 0 ? '#1e3a8a' : '#d97706';
 
-      ['trend-btn-inc', 'trend-btn-exp', 'trend-btn-surp'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.dataset.month = item.month;
+      ['trend-', 'tx-trend-'].forEach(prefix => {
+        const mEl = document.getElementById(prefix + 'det-month');
+        const iEl = document.getElementById(prefix + 'det-inc');
+        const eEl = document.getElementById(prefix + 'det-exp');
+        const surpLbl = document.getElementById(prefix + 'det-surp-lbl');
+        const surpEl = document.getElementById(prefix + 'det-surp');
+        if (mEl) mEl.textContent = item.label;
+        if (iEl) iEl.textContent = fmtInr(item.income);
+        if (eEl) eEl.textContent = fmtInr(item.expense);
+        if (surpLbl) surpLbl.textContent = item.surplus >= 0 ? 'Surplus' : 'Deficit';
+        if (surpEl) {
+          surpEl.textContent = fmtInr(item.surplus);
+          surpEl.style.color = item.surplus >= 0 ? '#1e3a8a' : '#d97706';
+        }
+        ['btn-inc', 'btn-exp', 'btn-surp'].forEach(suffix => {
+          const btn = document.getElementById(prefix + suffix);
+          if (btn) btn.dataset.month = item.month;
+        });
       });
 
-      document.querySelectorAll('#dash-monthly-trend .trend-col').forEach(g => {
+      document.querySelectorAll('#dash-monthly-trend .trend-col, #tx-monthly-trend .trend-col').forEach(g => {
         if (parseInt(g.getAttribute('data-idx'), 10) === idx) g.classList.add('selected');
         else g.classList.remove('selected');
       });
@@ -3006,11 +3039,14 @@
     }
 
     function renderMonthlyTrend(items) {
-      const el = document.getElementById('dash-monthly-trend');
-      if (!el) return;
+      const containers = ['dash-monthly-trend', 'tx-monthly-trend']
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+      if (!containers.length) return;
       monthlyTrendCache = items || [];
       if (!monthlyTrendCache.length) {
-        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No cash flow data available.</div>';
+        const emptyHtml = '<div style="color:var(--text-muted);font-size:0.85rem;">No cash flow data available.</div>';
+        containers.forEach(c => { c.innerHTML = emptyHtml; });
         return;
       }
 
@@ -3064,9 +3100,10 @@
         '</g>';
       });
 
-      el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;overflow:hidden;" role="img" aria-label="12-Month Cash Flow Chart">' +
+      const svgHtml = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;overflow:hidden;" role="img" aria-label="12-Month Cash Flow Chart">' +
         gridSvg + colsSvg +
       '</svg>';
+      containers.forEach(c => { c.innerHTML = svgHtml; });
 
       const defIdx = (selectedTrendIdx >= 0 && selectedTrendIdx < monthlyTrendCache.length)
         ? selectedTrendIdx
