@@ -1556,6 +1556,53 @@
         padding-bottom: 4px;
       }
     }
+
+    /* 12-Month Comparative Cash Flow Chart */
+    .trend-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .trend-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .trend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    .trend-detail-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 10px;
+      padding: 0.6rem 0.85rem;
+      margin-bottom: 0.85rem;
+      font-size: 0.83rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .trend-detail-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .trend-col { cursor: pointer; }
+    .trend-col:hover .trend-hover-bg { fill: #f1f5f9; }
+    .trend-col.selected .trend-hover-bg { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; }
+    @media (max-width: 640px) {
+      .trend-detail-strip { padding: 0.55rem 0.65rem; font-size: 0.78rem; }
+      .trend-detail-metrics { gap: 0.65rem; width: 100%; justify-content: space-between; }
+    }
   </style>
 </head>
 <body>
@@ -1638,6 +1685,29 @@
           </div>
         </div>
       </section>
+
+      <div class="panel-card" data-card="monthly_trend" id="dash-monthly-trend-card" style="margin-bottom: 1.15rem;">
+        <div class="panel-header" style="flex-wrap: wrap;">
+          <h3 class="panel-title">12-Month Cash Flow (Income, Expenditure &amp; Surplus)</h3>
+          <div class="trend-legend">
+            <span class="trend-legend-item"><span class="trend-dot" style="background:#059669;"></span>Income</span>
+            <span class="trend-legend-item"><span class="trend-dot" style="background:#e11d48;"></span>Expenditure</span>
+            <span class="trend-legend-item"><span class="trend-dot" style="background:#1e3a8a;"></span>Surplus</span>
+            <span class="trend-legend-item"><span class="trend-dot" style="background:#d97706;"></span>Deficit</span>
+          </div>
+        </div>
+        <div class="trend-detail-strip" id="trend-detail-strip">
+          <strong id="trend-det-month">-</strong>
+          <div class="trend-detail-metrics">
+            <span>Income: <strong id="trend-det-inc" style="color: var(--success-text);">-</strong></span>
+            <span>Expenditure: <strong id="trend-det-exp" style="color: var(--danger-text);">-</strong></span>
+            <span><span id="trend-det-surp-lbl">Surplus</span>: <strong id="trend-det-surp">-</strong></span>
+          </div>
+        </div>
+        <div id="dash-monthly-trend">
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Loading 12-month trend...</div>
+        </div>
+      </div>
 
       <div class="home-grid">
         <!-- Left Column -->
@@ -2290,6 +2360,7 @@
           <div class="form-field">
             <label>Dashboard Card Visibility</label>
             <div class="chk-grid" id="pref-cards-grid">
+              <label class="chk-item"><input type="checkbox" class="pref-card-chk" value="monthly_trend" checked> 12-Month Cash Flow</label>
               <label class="chk-item"><input type="checkbox" class="pref-card-chk" value="weekly_chart" checked> Weekly Expense Chart</label>
               <label class="chk-item"><input type="checkbox" class="pref-card-chk" value="calendar" checked> Monthly Calendar</label>
               <label class="chk-item"><input type="checkbox" class="pref-card-chk" value="top_categories" checked> Top Categories</label>
@@ -2592,6 +2663,8 @@
     const PORTAL_TO_DATE = {{ to_date | tojson }};
 
     let dashAccountsCache = [];
+    let monthlyTrendCache = [];
+    let selectedTrendIdx = -1;
     let formOptionsCache = null;
     let txOffset = 0;
     const TX_LIMIT = 50;
@@ -2817,6 +2890,7 @@
         surpEl.textContent = fmtInr(s.net_surplus);
         surpEl.className = 'kpi-value ' + (s.net_surplus >= 0 ? 'pos' : 'neg');
 
+        renderMonthlyTrend(data.monthly_trend || []);
         renderWeeklyBars(data.weekly_expenses || []);
         renderCalendar(month, data.calendar_days || []);
         renderTopCategories(data.top_categories || []);
@@ -2830,6 +2904,105 @@
       } catch (e) {
         console.error('Dashboard load error', e);
       }
+    }
+
+    function fmtCompactInr(val) {
+      const sign = val < 0 ? '-' : '';
+      const abs = Math.abs(val);
+      if (abs === 0) return '₹0';
+      if (abs >= 10000000) return sign + '₹' + (abs / 10000000).toFixed(1).replace(/\.0$/, '') + 'Cr';
+      if (abs >= 100000) return sign + '₹' + (abs / 100000).toFixed(1).replace(/\.0$/, '') + 'L';
+      if (abs >= 1000) return sign + '₹' + Math.round(abs / 1000) + 'k';
+      return sign + '₹' + Math.round(abs);
+    }
+
+    function selectTrendMonth(idxStr) {
+      const idx = parseInt(idxStr, 10);
+      if (isNaN(idx) || !monthlyTrendCache[idx]) return;
+      selectedTrendIdx = idx;
+      const item = monthlyTrendCache[idx];
+      document.getElementById('trend-det-month').textContent = item.label;
+      document.getElementById('trend-det-inc').textContent = fmtInr(item.income);
+      document.getElementById('trend-det-exp').textContent = fmtInr(item.expense);
+      const surpLbl = document.getElementById('trend-det-surp-lbl');
+      const surpEl = document.getElementById('trend-det-surp');
+      surpLbl.textContent = item.surplus >= 0 ? 'Surplus' : 'Deficit';
+      surpEl.textContent = fmtInr(item.surplus);
+      surpEl.style.color = item.surplus >= 0 ? '#1e3a8a' : '#d97706';
+
+      document.querySelectorAll('#dash-monthly-trend .trend-col').forEach(g => {
+        if (parseInt(g.getAttribute('data-idx'), 10) === idx) g.classList.add('selected');
+        else g.classList.remove('selected');
+      });
+    }
+
+    function renderMonthlyTrend(items) {
+      const el = document.getElementById('dash-monthly-trend');
+      if (!el) return;
+      monthlyTrendCache = items || [];
+      if (!monthlyTrendCache.length) {
+        el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No cash flow data available.</div>';
+        return;
+      }
+
+      const maxPos = Math.max(...monthlyTrendCache.map(d => Math.max(d.income || 0, d.expense || 0, d.surplus || 0, 0)), 1);
+      const minNeg = Math.min(...monthlyTrendCache.map(d => Math.min(d.income || 0, d.expense || 0, d.surplus || 0, 0)), 0);
+      const span = (maxPos - minNeg) || 1;
+
+      const W = 760, H = 230;
+      const padL = 52, padR = 10, padT = 14, padB = 28;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+      const yScale = (v) => padT + ((maxPos - v) / span) * plotH;
+      const yZero = yScale(0);
+
+      // 4 clean horizontal gridlines
+      const ticks = [maxPos, maxPos * 0.5, 0];
+      if (minNeg < -0.01) ticks.push(minNeg);
+      let gridSvg = '';
+      ticks.forEach(t => {
+        const y = yScale(t).toFixed(1);
+        const isZero = Math.abs(t) < 0.01;
+        gridSvg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="' + (isZero ? '#94a3b8' : '#e2e8f0') + '" stroke-width="' + (isZero ? '1.2' : '1') + '" ' + (isZero ? '' : 'stroke-dasharray="3,3"') + '/>';
+        gridSvg += '<text x="' + (padL - 6) + '" y="' + (parseFloat(y) + 3.5).toFixed(1) + '" text-anchor="end" font-size="10.5" fill="#64748b" font-family="system-ui,sans-serif">' + escHtml(fmtCompactInr(t)) + '</text>';
+      });
+
+      const colW = plotW / monthlyTrendCache.length;
+      const barW = Math.min(12, Math.max(7, (colW - 14) / 3));
+      const gap = 2;
+      const groupW = barW * 3 + gap * 2;
+      let colsSvg = '';
+
+      monthlyTrendCache.forEach((d, idx) => {
+        const colX = padL + idx * colW;
+        const startX = colX + (colW - groupW) / 2;
+
+        const barRect = (x, val, color) => {
+          const yVal = yScale(val);
+          const yTop = Math.min(yVal, yZero);
+          const bh = Math.max(val === 0 ? 0 : 2, Math.abs(yZero - yVal));
+          if (bh <= 0) return '';
+          return '<rect x="' + x.toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="' + color + '"/>';
+        };
+
+        const surpColor = d.surplus >= 0 ? '#1e3a8a' : '#d97706';
+        colsSvg += '<g class="trend-col" data-idx="' + idx + '" onclick="selectTrendMonth(this.dataset.idx)">' +
+          '<rect class="trend-hover-bg" x="' + (colX + 2).toFixed(1) + '" y="' + padT + '" width="' + (colW - 4).toFixed(1) + '" height="' + plotH + '" rx="6" fill="transparent"/>' +
+          barRect(startX, d.income, '#059669') +
+          barRect(startX + barW + gap, d.expense, '#e11d48') +
+          barRect(startX + (barW + gap) * 2, d.surplus, surpColor) +
+          '<text x="' + (colX + colW / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="10.5" font-weight="600" fill="#475569" font-family="system-ui,sans-serif">' + escHtml(d.short_label) + '</text>' +
+        '</g>';
+      });
+
+      el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;overflow:hidden;" role="img" aria-label="12-Month Cash Flow Chart">' +
+        gridSvg + colsSvg +
+      '</svg>';
+
+      const defIdx = (selectedTrendIdx >= 0 && selectedTrendIdx < monthlyTrendCache.length)
+        ? selectedTrendIdx
+        : (monthlyTrendCache.length - 1);
+      selectTrendMonth(String(defIdx));
     }
 
     function renderWeeklyBars(items) {

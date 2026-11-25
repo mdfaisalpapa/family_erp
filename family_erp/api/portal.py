@@ -481,6 +481,7 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 
 	tag_totals = sorted(tag_agg.values(), key=lambda x: (-x["amount"], x["tag_name"]))
 
+	monthly_trend = _compute_monthly_trend(company, today_str)
 	budgets = _compute_budgets(company, target_month)
 	preferences = _get_user_preferences(frappe.session.user, company)
 
@@ -488,6 +489,7 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 		"summary": summary,
 		"accounts": accounts,
 		"weekly_expenses": weekly_expenses,
+		"monthly_trend": monthly_trend,
 		"calendar_days": calendar_days,
 		"top_categories": top_categories,
 		"todo_transactions": todo_transactions,
@@ -1209,6 +1211,65 @@ def _find_adjustment_account(company, exclude_account):
 	if fallback:
 		return fallback[0][0]
 	frappe.throw(_("No adjustment / offset account found in Company '{0}'.").format(company))
+
+
+MONTH_ABBR = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _compute_monthly_trend(company, today_str):
+	"""Computes last 12 calendar months ending in today_str's month, capped at posting_date <= today_str."""
+	today_d = getdate(today_str)
+	end_year, end_month = today_d.year, today_d.month
+
+	months_12 = []
+	for back in range(11, -1, -1):
+		total_m = (end_year * 12 + (end_month - 1)) - back
+		y, m0 = divmod(total_m, 12)
+		m = m0 + 1
+		months_12.append((y, m, f"{y:04d}-{m:02d}"))
+
+	trend_start = f"{months_12[0][0]:04d}-{months_12[0][1]:02d}-01"
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			DATE_FORMAT(gle.posting_date, '%%Y-%%m') AS ym,
+			acc.root_type,
+			COALESCE(SUM(CASE WHEN acc.root_type = 'Income' THEN gle.credit - gle.debit ELSE gle.debit - gle.credit END), 0) AS amt
+		FROM `tabGL Entry` gle
+		INNER JOIN `tabAccount` acc ON gle.account = acc.name
+		WHERE gle.company = %(company)s
+			AND gle.is_cancelled = 0
+			AND acc.root_type IN ('Income', 'Expense')
+			AND gle.posting_date BETWEEN %(trend_start)s AND %(today)s
+		GROUP BY DATE_FORMAT(gle.posting_date, '%%Y-%%m'), acc.root_type
+		""",
+		{"company": company, "trend_start": trend_start, "today": today_str},
+		as_dict=True,
+	)
+
+	agg = {}
+	for r in rows:
+		ym = r.get("ym")
+		if not ym:
+			continue
+		entry = agg.setdefault(ym, {"Income": 0.0, "Expense": 0.0})
+		if r.get("root_type") in ("Income", "Expense"):
+			entry[r["root_type"]] = flt(r.get("amt"), 2)
+
+	trend = []
+	for y, m, ym in months_12:
+		inc = round(agg.get(ym, {}).get("Income", 0.0), 2)
+		exp = round(agg.get(ym, {}).get("Expense", 0.0), 2)
+		surplus = round(inc - exp, 2)
+		trend.append({
+			"month": ym,
+			"short_label": MONTH_ABBR[m],
+			"label": f"{MONTH_ABBR[m]} '{str(y)[2:]}",
+			"income": inc,
+			"expense": exp,
+			"surplus": surplus,
+		})
+	return trend
 
 
 def _resolve_month_and_fy(month=None):
