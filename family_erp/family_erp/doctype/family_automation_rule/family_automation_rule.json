@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-25 08:15:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "rule_group",
+  "sort_order",
+  "is_active",
+  "match_all",
+  "stop_processing",
+  "triggers",
+  "actions"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rule_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Rule Group",
+   "options": "Family Rule Group",
+   "reqd": 1
+  },
+  {
+   "default": "10",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sort Order"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Active"
+  },
+  {
+   "default": "1",
+   "fieldname": "match_all",
+   "fieldtype": "Check",
+   "label": "Match All Triggers (AND)"
+  },
+  {
+   "default": "0",
+   "fieldname": "stop_processing",
+   "fieldtype": "Check",
+   "label": "Stop Processing Further Rules"
+  },
+  {
+   "fieldname": "triggers",
+   "fieldtype": "Table",
+   "label": "Triggers",
+   "options": "Family Rule Trigger"
+  },
+  {
+   "fieldname": "actions",
+   "fieldtype": "Table",
+   "label": "Actions",
+   "options": "Family Rule Action"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-25 08:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Family ERP",
+ "name": "Family Automation Rule",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "Family Portal User",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Family Viewer"
+  }
+ ],
+ "sort_field": "sort_order",
+ "sort_order": "ASC",
+ "states": []
+}

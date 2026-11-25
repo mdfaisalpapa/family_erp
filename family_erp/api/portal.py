@@ -6,6 +6,7 @@ import frappe
 from frappe import _
 from frappe.desk.doctype.tag.tag import DocTags
 from frappe.utils import add_days, cint, flt, get_first_day, get_last_day, getdate, nowdate, today
+from family_erp.utils.rules_engine import evaluate_rules, serialize_rule_doc
 
 
 CREDIT_CARD_SQL = "(acc.account_name LIKE 'Credit Card%%' OR acc.parent_account LIKE '%%Credit Card%%')"
@@ -1746,3 +1747,73 @@ def save_preferences(quick_amounts=None, default_from_account=None, pinned_accou
 	doc.save()
 	frappe.db.commit()
 	return _get_user_preferences(user, company)
+
+
+@frappe.whitelist()
+def test_automation_rule(rule_name, limit=20):
+	"""
+	Dry-run evaluates a Family Automation Rule against recent submitted Journal Entry records
+	(capped at today()) without modifying any ledger entries.
+	"""
+	company, _can_write = _resolve_portal_company()
+	if not rule_name or not frappe.db.exists("Family Automation Rule", rule_name):
+		frappe.throw(_("Automation Rule '{0}' does not exist.").format(rule_name), frappe.DoesNotExistError)
+
+	rule_doc = frappe.get_doc("Family Automation Rule", rule_name)
+	rule_dict = serialize_rule_doc(rule_doc)
+
+	limit = min(max(cint(limit) or 20, 1), 100)
+	je_rows = frappe.db.sql(
+		"""
+		SELECT je.name, je.posting_date, je.user_remark, je.remark, je._user_tags
+		FROM `tabJournal Entry` je
+		WHERE je.company = %(company)s
+			AND je.docstatus = 1
+			AND je.posting_date <= %(today)s
+		ORDER BY je.posting_date DESC, je.creation DESC
+		LIMIT %(limit)s
+		""",
+		{"company": company, "today": today(), "limit": limit},
+		as_dict=True,
+	)
+	raw_notes = {r.name: (r.remark or r.user_remark or "") for r in je_rows}
+	hydrated = _hydrate_je_list(je_rows)
+
+	matches = []
+	for item in hydrated:
+		tx_payload = {
+			"transaction_type": item.get("tx_type") or "",
+			"description": item.get("description") or "",
+			"source_account": item.get("from_account") or "",
+			"destination_account": item.get("to_account") or "",
+			"notes": raw_notes.get(item.get("name"), ""),
+			"amount": item.get("amount") or 0.0,
+			"tags": item.get("tags") or [],
+		}
+		res = evaluate_rules(tx_payload, company=company, rules=[rule_dict])
+		if res["matched_rules"]:
+			matches.append(
+				{
+					"name": item.get("name"),
+					"posting_date": item.get("posting_date"),
+					"tx_type": item.get("tx_type"),
+					"amount": item.get("amount"),
+					"from_account": item.get("from_account"),
+					"to_account": item.get("to_account"),
+					"description": item.get("description"),
+					"previewed_actions": res["matched_rules"][0]["actions"],
+					"previewed_payload": res["payload"],
+					"skipped": res["skipped"],
+				}
+			)
+
+	return {
+		"rule": {
+			"name": rule_doc.name,
+			"title": rule_doc.title,
+			"rule_group": rule_doc.rule_group,
+		},
+		"tested_count": len(hydrated),
+		"matched_count": len(matches),
+		"matches": matches,
+	}

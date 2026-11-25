@@ -1,0 +1,39 @@
+{
+ "actions": [],
+ "creation": "2026-11-25 08:15:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "action_type",
+  "action_value"
+ ],
+ "fields": [
+  {
+   "fieldname": "action_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Action Type",
+   "options": "set_source_account\nset_destination_account\nconvert_transfer\nadd_tag\nremove_all_tags\nset_description\nset_amount\nskip_transaction",
+   "reqd": 1
+  },
+  {
+   "fieldname": "action_value",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Action Value"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-25 08:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Family ERP",
+ "name": "Family Rule Action",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}
