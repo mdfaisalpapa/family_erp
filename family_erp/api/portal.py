@@ -5,7 +5,7 @@ import json
 import frappe
 from frappe import _
 from frappe.desk.doctype.tag.tag import DocTags
-from frappe.utils import add_days, cint, flt, get_first_day, get_last_day, getdate, nowdate
+from frappe.utils import add_days, cint, flt, get_first_day, get_last_day, getdate, nowdate, today
 
 
 CREDIT_CARD_SQL = "(acc.account_name LIKE 'Credit Card%%' OR acc.parent_account LIKE '%%Credit Card%%')"
@@ -214,10 +214,9 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 	"""
 	company, can_write = _resolve_portal_company()
 
+	today_str = today()
 	from_date = str(getdate(from_date)) if from_date else "2022-04-01"
-	to_date = str(getdate(to_date)) if to_date else "2027-12-31"
-
-	today_str = nowdate()
+	to_date = str(min(getdate(to_date), getdate(today_str))) if to_date else today_str
 	target_month = (month or today_str[:7]).strip()
 	try:
 		month_anchor = getdate(f"{target_month}-01")
@@ -360,25 +359,28 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 		for d in range(7)
 	]
 
-	# 4. Calendar days (daily income & expense for target month)
-	cal_raw = frappe.db.sql(
-		"""
-		SELECT
-			gle.posting_date,
-			ROUND(COALESCE(SUM(CASE WHEN acc.root_type = 'Income' THEN gle.credit - gle.debit ELSE 0 END), 0), 2) AS income,
-			ROUND(COALESCE(SUM(CASE WHEN acc.root_type = 'Expense' THEN gle.debit - gle.credit ELSE 0 END), 0), 2) AS expense
-		FROM `tabGL Entry` gle
-		INNER JOIN `tabAccount` acc ON gle.account = acc.name
-		WHERE gle.company = %(company)s
-			AND gle.is_cancelled = 0
-			AND acc.root_type IN ('Income', 'Expense')
-			AND gle.posting_date BETWEEN %(month_start)s AND %(month_end)s
-		GROUP BY gle.posting_date
-		ORDER BY gle.posting_date ASC
-		""",
-		{"company": company, "month_start": month_start, "month_end": month_end},
-		as_dict=True,
-	)
+	# 4. Calendar days (daily income & expense for target month, capped to today)
+	cal_end = str(min(getdate(month_end), getdate(today_str)))
+	cal_raw = []
+	if getdate(month_start) <= getdate(cal_end):
+		cal_raw = frappe.db.sql(
+			"""
+			SELECT
+				gle.posting_date,
+				ROUND(COALESCE(SUM(CASE WHEN acc.root_type = 'Income' THEN gle.credit - gle.debit ELSE 0 END), 0), 2) AS income,
+				ROUND(COALESCE(SUM(CASE WHEN acc.root_type = 'Expense' THEN gle.debit - gle.credit ELSE 0 END), 0), 2) AS expense
+			FROM `tabGL Entry` gle
+			INNER JOIN `tabAccount` acc ON gle.account = acc.name
+			WHERE gle.company = %(company)s
+				AND gle.is_cancelled = 0
+				AND acc.root_type IN ('Income', 'Expense')
+				AND gle.posting_date BETWEEN %(month_start)s AND %(month_end)s
+			GROUP BY gle.posting_date
+			ORDER BY gle.posting_date ASC
+			""",
+			{"company": company, "month_start": month_start, "month_end": cal_end},
+			as_dict=True,
+		)
 	calendar_days = [
 		{"date": str(r.posting_date), "income": flt(r.income, 2), "expense": flt(r.expense, 2)}
 		for r in cal_raw
@@ -421,7 +423,7 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 	todo_transactions = []
 	if todo_tag_names:
 		like_clauses = []
-		todo_params = {"company": company}
+		todo_params = {"company": company, "to_date": to_date}
 		for idx, t_name in enumerate(todo_tag_names):
 			key = f"t{idx}"
 			like_clauses.append(f"CONCAT(',', COALESCE(je._user_tags, ''), ',') LIKE CONCAT('%,', %({key})s, ',%')")
@@ -432,6 +434,7 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 			FROM `tabJournal Entry` je
 			WHERE je.company = %(company)s
 				AND je.docstatus = 1
+				AND je.posting_date <= %(to_date)s
 				AND ({' OR '.join(like_clauses)})
 			ORDER BY je.posting_date DESC, je.creation DESC
 			LIMIT 20
@@ -514,9 +517,8 @@ def get_transactions(search="", account="", tx_type="", tag="", from_date=None, 
 	if from_date:
 		conds.append("je.posting_date >= %(from_date)s")
 		params["from_date"] = str(getdate(from_date))
-	if to_date:
-		conds.append("je.posting_date <= %(to_date)s")
-		params["to_date"] = str(getdate(to_date))
+	conds.append("je.posting_date <= %(to_date)s")
+	params["to_date"] = str(getdate(to_date)) if to_date else today()
 	if account:
 		conds.append(
 			"EXISTS (SELECT 1 FROM `tabJournal Entry Account` j WHERE j.parent = je.name AND j.account = %(account)s)"
@@ -1246,7 +1248,12 @@ def _compute_budgets(company, month=None):
 		):
 			acc_labels[r.name] = r.account_name
 
+	today_d = getdate(today())
+
 	def _spent_map(start_d, end_d):
+		capped_end = min(getdate(end_d), today_d)
+		if getdate(start_d) > capped_end:
+			return {}
 		rows = frappe.db.sql(
 			"""
 			SELECT account, COALESCE(SUM(debit - credit), 0) AS spent
@@ -1257,7 +1264,7 @@ def _compute_budgets(company, month=None):
 				AND posting_date BETWEEN %(s)s AND %(e)s
 			GROUP BY account
 			""",
-			{"company": company, "accounts": acc_names, "s": start_d, "e": end_d},
+			{"company": company, "accounts": acc_names, "s": start_d, "e": str(capped_end)},
 			as_dict=True,
 		)
 		return {r.account: flt(r.spent, 2) for r in rows}
@@ -1319,6 +1326,7 @@ def get_accounts_overview():
 			ON gle.account = acc.name
 			AND gle.company = %(company)s
 			AND gle.is_cancelled = 0
+			AND gle.posting_date <= %(today)s
 		WHERE acc.company = %(company)s
 			AND acc.is_group = 0
 			AND (
@@ -1330,7 +1338,7 @@ def get_accounts_overview():
 		HAVING acc.disabled = 0 OR ABS(raw_dr_cr) >= 0.01
 		ORDER BY acc.root_type ASC, acc.account_type DESC, acc.account_name ASC
 		""",
-		{"company": company},
+		{"company": company, "today": today()},
 		as_dict=True,
 	)
 
@@ -1367,7 +1375,7 @@ def adjust_account_balance(account, target_balance, posting_date=None, descripti
 
 	acc_doc = _validate_account_belongs_to(account, company, "Account")
 	target_val = flt(target_balance, 2)
-	posting_date = str(getdate(posting_date)) if posting_date else nowdate()
+	posting_date = str(getdate(posting_date)) if posting_date else today()
 	description = (description or "Balance Adjustment").strip()
 
 	raw_res = frappe.db.sql(
@@ -1377,8 +1385,9 @@ def adjust_account_balance(account, target_balance, posting_date=None, descripti
 		WHERE company = %(company)s
 			AND account = %(account)s
 			AND is_cancelled = 0
+			AND posting_date <= %(posting_date)s
 		""",
-		{"company": company, "account": account},
+		{"company": company, "account": account, "posting_date": posting_date},
 	)
 	raw_dr_cr = flt(raw_res[0][0], 2) if raw_res else 0.0
 	is_credit_normal = acc_doc.root_type in ("Liability", "Equity", "Income")

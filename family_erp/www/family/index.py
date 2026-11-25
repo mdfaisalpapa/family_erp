@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import flt, fmt_money
+from frappe.utils import flt, fmt_money, getdate, today
 from family_erp.family_erp.report.family_dues_statement import family_dues_statement
 
 no_cache = 1
@@ -82,9 +82,11 @@ def get_context(context):
 	context["can_write"] = ("Family Portal User" in user_roles or is_system_manager)
 	context["title"] = f"{company} - Family Portal"
 
-	# Date filters
+	# Date filters (default to_date to today() so future-dated entries are excluded)
 	from_date = frappe.form_dict.get("from_date") or "2022-04-01"
-	to_date = frappe.form_dict.get("to_date") or "2027-12-31"
+	explicit_to = frappe.form_dict.get("to_date")
+	to_date = explicit_to or today()
+	as_on_date = frappe.form_dict.get("as_on_date")
 	context["from_date"] = from_date
 	context["to_date"] = to_date
 
@@ -117,8 +119,8 @@ def get_context(context):
 		_populate_dues_statement(context, raw_data, to_date)
 
 	# Financial statements (for all companies)
-	_populate_balance_sheet(context, company, to_date)
-	_populate_income_expenditure(context, company, from_date, to_date)
+	_populate_balance_sheet(context, company, as_on_date)
+	_populate_income_expenditure(context, company, from_date, to_date, explicit_to=bool(explicit_to))
 
 	# Fetch Properties for this company
 	properties = frappe.get_all(
@@ -426,7 +428,8 @@ def _set_empty_gl_context(context, scope_label, to_date):
 	context["balance_subtext"] = f"No transactions recorded for {scope_label} as of {to_date}."
 
 
-def _populate_balance_sheet(context, company, to_date):
+def _populate_balance_sheet(context, company, as_on_date=None):
+	effective_as_on = str(getdate(as_on_date)) if as_on_date else today()
 	rows = frappe.db.sql(
 		"""
 		SELECT
@@ -444,7 +447,7 @@ def _populate_balance_sheet(context, company, to_date):
 		GROUP BY acc.name, acc.account_name, acc.parent_account, acc.root_type
 		ORDER BY acc.root_type ASC, acc.parent_account ASC, acc.account_name ASC
 		""",
-		{"company": company, "to_date": to_date},
+		{"company": company, "to_date": effective_as_on},
 		as_dict=True,
 	)
 
@@ -498,7 +501,8 @@ def _populate_balance_sheet(context, company, to_date):
 	context["bs_net_worth_formatted"] = fmt_inr(net_worth)
 
 
-def _populate_income_expenditure(context, company, from_date, to_date):
+def _populate_income_expenditure(context, company, from_date, to_date, explicit_to=False):
+	effective_to = str(getdate(to_date)) if explicit_to else str(min(getdate(to_date), getdate(today())))
 	rows = frappe.db.sql(
 		"""
 		SELECT
@@ -516,7 +520,7 @@ def _populate_income_expenditure(context, company, from_date, to_date):
 		GROUP BY acc.name, acc.account_name, acc.parent_account, acc.root_type
 		ORDER BY acc.root_type ASC, acc.parent_account ASC, acc.account_name ASC
 		""",
-		{"company": company, "from_date": from_date, "to_date": to_date},
+		{"company": company, "from_date": from_date, "to_date": effective_to},
 		as_dict=True,
 	)
 
