@@ -136,12 +136,16 @@ def _infer_je_details(je, jea_rows, attachments_count):
 
 	return {
 		"name": je.name,
+		"voucher": je.name,
 		"posting_date": str(je.posting_date),
 		"tx_type": inferred_type,
+		"type": inferred_type,
 		"amount": amount,
 		"from_account": from_account,
+		"source_account": from_account,
 		"from_account_name": from_account_name,
 		"to_account": to_account,
+		"destination_account": to_account,
 		"to_account_name": to_account_name,
 		"description": je.user_remark or je.remark or "",
 		"attachments_count": attachments_count,
@@ -856,7 +860,117 @@ def create_transaction(
 
 
 @frappe.whitelist(methods=["POST"])
-def delete_transaction(voucher_no):
+def update_transaction(
+	voucher,
+	posting_date=None,
+	amount=None,
+	source_account=None,
+	destination_account=None,
+	description=None,
+	tags=None,
+):
+	"""
+	Updates a submitted Journal Entry by cancelling it and creating/submitting an updated
+	(amended) Journal Entry with the revised posting_date, amount, accounts, description, and tags.
+	"""
+	company, can_write = _resolve_portal_company()
+	if not can_write:
+		frappe.throw(_("You do not have write permission on this portal."), frappe.PermissionError)
+
+	voucher = (voucher or "").strip()
+	if not voucher or not frappe.db.exists("Journal Entry", voucher):
+		frappe.throw(_("Journal Entry '{0}' does not exist.").format(voucher))
+
+	old_je = frappe.get_doc("Journal Entry", voucher)
+	if old_je.company != company:
+		frappe.throw(
+			_("Journal Entry '{0}' does not belong to Company '{1}'.").format(voucher, company),
+			frappe.PermissionError,
+		)
+	if old_je.docstatus != 1:
+		frappe.throw(_("Journal Entry '{0}' is not submitted.").format(voucher))
+
+	ft_hit = frappe.db.sql(
+		"""
+		SELECT name FROM `tabFamily Transaction`
+		WHERE docstatus = 1 AND (primary_journal_entry = %(v)s OR counterparty_journal_entry = %(v)s)
+		LIMIT 1
+		""",
+		{"v": voucher},
+	)
+	if ft_hit:
+		frappe.throw(_("Inter-company Family Transactions cannot be edited inline; cancel and recreate instead."))
+
+	hydrated_old = _hydrate_je_list([old_je])[0]
+	new_date = str(getdate(posting_date)) if posting_date else str(old_je.posting_date)
+	new_amt = flt(amount) if amount is not None and str(amount).strip() != "" else flt(hydrated_old.get("amount"))
+	if new_amt <= 0:
+		frappe.throw(_("Amount must be greater than zero."))
+
+	new_src = (source_account or hydrated_old.get("from_account") or "").strip()
+	new_dst = (destination_account or hydrated_old.get("to_account") or "").strip()
+	_validate_account_belongs_to(new_src, company, "Source Account")
+	_validate_account_belongs_to(new_dst, company, "Destination Account")
+	if new_src == new_dst:
+		frappe.throw(_("Source Account and Destination Account cannot be the same."))
+
+	new_desc = (old_je.user_remark or old_je.remark or "") if description is None else str(description).strip()
+	tags_list = hydrated_old.get("tags", []) if tags is None else _parse_csv_list(tags)
+
+	qe_name = frappe.db.get_value(
+		"Quick Expense",
+		{"journal_entry": voucher, "docstatus": 1, "company": company},
+		"name",
+	)
+	if qe_name:
+		qe = frappe.get_doc("Quick Expense", qe_name)
+		qe.flags.ignore_permissions = True
+		qe.cancel()
+	else:
+		old_je.flags.ignore_permissions = True
+		old_je.cancel()
+
+	new_je = frappe.new_doc("Journal Entry")
+	new_je.voucher_type = old_je.voucher_type or "Journal Entry"
+	new_je.company = company
+	new_je.posting_date = new_date
+	new_je.user_remark = new_desc or f"{new_src} -> {new_dst}"
+	if not qe_name:
+		new_je.amended_from = old_je.name
+	new_je.append(
+		"accounts",
+		{
+			"account": new_dst,
+			"debit_in_account_currency": new_amt,
+			"credit_in_account_currency": 0,
+		},
+	)
+	new_je.append(
+		"accounts",
+		{
+			"account": new_src,
+			"debit_in_account_currency": 0,
+			"credit_in_account_currency": new_amt,
+		},
+	)
+	new_je.flags.ignore_permissions = True
+	new_je.insert()
+	new_je.submit()
+
+	_apply_tags_to_je(new_je.name, tags_list)
+	frappe.db.commit()
+
+	updated_tx = _hydrate_je_list([new_je])[0]
+	return {
+		"ok": True,
+		"old_voucher": voucher,
+		"voucher": new_je.name,
+		"transaction": updated_tx,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_transaction(voucher=None, voucher_no=None):
 	"""
 	Cancels a submitted Journal Entry (or its linked Quick Expense / Family Transaction)
 	strictly scoped to the user's locked Company. Requires Family Portal User or System Manager.
@@ -865,7 +979,7 @@ def delete_transaction(voucher_no):
 	if not can_write:
 		frappe.throw(_("You do not have write permission on this portal."), frappe.PermissionError)
 
-	voucher_no = (voucher_no or "").strip()
+	voucher_no = (voucher or voucher_no or "").strip()
 	if not voucher_no or not frappe.db.exists("Journal Entry", voucher_no):
 		frappe.throw(_("Journal Entry '{0}' does not exist.").format(voucher_no))
 
@@ -888,7 +1002,14 @@ def delete_transaction(voucher_no):
 		qe.flags.ignore_permissions = True
 		qe.cancel()
 		frappe.db.commit()
-		return {"status": "cancelled", "doctype": "Quick Expense", "name": qe.name, "voucher_no": voucher_no}
+		return {
+			"ok": True,
+			"status": "cancelled",
+			"doctype": "Quick Expense",
+			"name": qe.name,
+			"voucher": voucher_no,
+			"voucher_no": voucher_no,
+		}
 
 	ft_name = frappe.db.sql(
 		"""
@@ -914,16 +1035,25 @@ def delete_transaction(voucher_no):
 		ft.cancel()
 		frappe.db.commit()
 		return {
+			"ok": True,
 			"status": "cancelled",
 			"doctype": "Family Transaction",
 			"name": ft.name,
+			"voucher": voucher_no,
 			"voucher_no": voucher_no,
 		}
 
 	je.flags.ignore_permissions = True
 	je.cancel()
 	frappe.db.commit()
-	return {"status": "cancelled", "doctype": "Journal Entry", "name": je.name, "voucher_no": voucher_no}
+	return {
+		"ok": True,
+		"status": "cancelled",
+		"doctype": "Journal Entry",
+		"name": je.name,
+		"voucher": voucher_no,
+		"voucher_no": voucher_no,
+	}
 
 
 # --- Templates ---

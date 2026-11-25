@@ -799,7 +799,45 @@
     }
     .tx-badge-Expense, .tx-badge-Withdrawal { background: var(--danger-bg); color: var(--danger-text); }
     .tx-badge-Income, .tx-badge-Deposit { background: var(--success-bg); color: var(--success-text); }
-    .tx-badge-Transfer { background: #eff6ff; color: #1d4ed8; }
+    .tx-badge-Transfer { background: #e0e7ff; color: #3730a3; }
+    .clickable-tx-row {
+      cursor: pointer;
+      transition: border-color 0.12s ease, background 0.12s ease;
+    }
+    .clickable-tx-row:hover {
+      border-color: #bfdbfe;
+      background: #f8fafc;
+    }
+    .tx-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin: 0.85rem 0;
+    }
+    .tx-detail-cell {
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 10px;
+      padding: 0.6rem 0.75rem;
+      min-width: 0;
+    }
+    .tx-detail-lbl {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.18rem;
+    }
+    .tx-detail-val {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text-main);
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    @media (max-width: 640px) {
+      .tx-detail-grid { grid-template-columns: 1fr; }
+    }
     .tx-badge-Family { background: #f3e8ff; color: #6b21a8; }
 
     /* Modal */
@@ -1039,7 +1077,7 @@
       cursor: pointer;
     }
     @media print {
-      #tab-accounts-budgets, #tab-settings, #adjust-balance-modal, #budget-modal, #rule-dryrun-modal { display: none !important; }
+      #tab-accounts-budgets, #tab-settings, #adjust-balance-modal, #budget-modal, #rule-dryrun-modal, #tx-detail-modal { display: none !important; }
     }
 
     /* Clean Bookkeeping Redesign */
@@ -2280,6 +2318,7 @@
         <div class="quick-presets">
           <button type="button" class="btn btn-outline" onclick="setDateRange('2022-04-01', '2027-12-31')">All Time</button>
           <button type="button" class="btn btn-outline" onclick="setDateRange('2026-04-01', '2027-03-31')">FY 2026-27</button>
+          <span class="pie-period-badge" id="stmt-period-badge" title="Displayed in DD MM YYYY">{{ from_date_display }} &ndash; {{ to_date_display }}</span>
         </div>
 
         <form method="GET" class="date-filter-form">
@@ -2304,6 +2343,10 @@
 
       {% if statement_error %}
       <div class="alert-banner alert-warning">{{ statement_error }}</div>
+      {% endif %}
+
+      {% if balance_subtext %}
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.65rem;">{{ balance_subtext }}</div>
       {% endif %}
 
       {% if gl_truncated_note %}
@@ -3142,6 +3185,88 @@
     </div>
   </div>
 
+  <!-- Transaction Details / Edit / Delete Modal -->
+  <div id="tx-detail-modal" class="modal-backdrop" onclick="if(event.target===this) closeTxDetailModal()">
+    <div class="modal-dialog" style="max-width: 560px; width: 95%;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0;">
+          <span id="txd-badge"></span>
+          <h3 id="txd-modal-title" style="margin: 0; font-size: 1.05rem; font-weight: 700;">Transaction Details</h3>
+        </div>
+        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem; flex-shrink: 0;" onclick="closeTxDetailModal()">&times;</button>
+      </div>
+
+      <div id="tx-detail-view">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; padding-bottom: 0.7rem; border-bottom: 1px solid #f1f5f9;">
+          <div>
+            <div id="txd-date" style="font-size: 0.84rem; font-weight: 700; color: var(--text-main);"></div>
+            <div id="txd-voucher" style="font-size: 0.76rem; color: var(--text-muted);"></div>
+          </div>
+          <div id="txd-amount" style="font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums;"></div>
+        </div>
+
+        <div class="tx-detail-grid">
+          <div class="tx-detail-cell">
+            <div class="tx-detail-lbl">From (Source) Account</div>
+            <div class="tx-detail-val" id="txd-from"></div>
+          </div>
+          <div class="tx-detail-cell">
+            <div class="tx-detail-lbl">To (Destination) Account</div>
+            <div class="tx-detail-val" id="txd-to"></div>
+          </div>
+          <div class="tx-detail-cell" style="grid-column: 1 / -1;">
+            <div class="tx-detail-lbl">Description / Remarks</div>
+            <div class="tx-detail-val" id="txd-desc"></div>
+          </div>
+          <div class="tx-detail-cell" style="grid-column: 1 / -1;">
+            <div class="tx-detail-lbl">Tags</div>
+            <div class="tx-detail-val" id="txd-tags"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.9rem;">
+          <div style="display: flex; gap: 0.5rem;" id="txd-write-actions">
+            <button type="button" class="btn btn-primary" onclick="switchTxDetailToEdit()">Edit</button>
+            <button type="button" class="btn btn-danger-outline" onclick="deleteFromTxDetailModal()">Delete</button>
+          </div>
+          <button type="button" class="btn btn-outline" onclick="closeTxDetailModal()">Close</button>
+        </div>
+      </div>
+
+      <form id="tx-detail-edit" style="display: none;" onsubmit="saveTxDetailEdit(event)">
+        <input type="hidden" id="txd-edit-voucher" value="">
+        <div class="form-field">
+          <label for="txd-edit-date">Date <span id="txd-edit-date-disp" style="font-weight: 400; color: var(--primary);"></span></label>
+          <input type="date" id="txd-edit-date" class="form-control" required oninput="document.getElementById('txd-edit-date-disp').textContent = this.value ? '(' + fmtDate(this.value) + ')' : ''">
+        </div>
+        <div class="form-field">
+          <label for="txd-edit-amount">Amount (&#8377;)</label>
+          <input type="number" step="0.01" min="0.01" id="txd-edit-amount" class="form-control" required>
+        </div>
+        <div class="form-field">
+          <label for="txd-edit-from">From (Source) Account</label>
+          <select id="txd-edit-from" class="form-control" required></select>
+        </div>
+        <div class="form-field">
+          <label for="txd-edit-to">To (Destination) Account</label>
+          <select id="txd-edit-to" class="form-control" required></select>
+        </div>
+        <div class="form-field">
+          <label for="txd-edit-desc">Description / Remarks</label>
+          <input type="text" id="txd-edit-desc" class="form-control" placeholder="Description or remarks">
+        </div>
+        <div class="form-field">
+          <label for="txd-edit-tags">Tags (comma-separated)</label>
+          <input type="text" id="txd-edit-tags" class="form-control" placeholder="e.g. Groceries, To-Pay">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.55rem; margin-top: 1rem;">
+          <button type="button" class="btn btn-outline" onclick="cancelTxDetailEdit()">Back</button>
+          <button type="submit" id="txd-edit-submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const PORTAL_CSRF_TOKEN = '{{ csrf_token }}';
     const PORTAL_COMPANY = {{ selected_company | tojson }};
@@ -3195,6 +3320,21 @@
       const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/.exec(s);
       if (!m) return s;
       return m[3] + ' ' + m[2] + ' ' + m[1];
+    }
+
+    const txCacheByVoucher = {};
+
+    function txTypeLabel(txType) {
+      const t = (txType || '').trim();
+      if (t === 'Expense' || t === 'Withdrawal') return 'Expenditure';
+      if (t === 'Income' || t === 'Deposit') return 'Income';
+      if (t === 'Transfer') return 'Transfer';
+      return t || 'Entry';
+    }
+
+    function txBadgeHtml(txType) {
+      const raw = (txType || 'Transfer').trim();
+      return '<span class="tx-badge tx-badge-' + escHtml(raw) + '">' + escHtml(txTypeLabel(raw)) + '</span>';
     }
 
     function showToast(msg, type) {
@@ -3867,18 +4007,19 @@
           el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No transactions recorded yet.</div>';
           return;
         }
-        el.innerHTML = items.map(tx =>
-          '<div class="recent-tx-row">' +
+        el.innerHTML = items.map(tx => {
+          txCacheByVoucher[tx.name] = tx;
+          return '<div class="recent-tx-row clickable-tx-row" data-voucher="' + escHtml(tx.name) + '" onclick="openTxDetailModal(this.dataset.voucher)">' +
             '<div style="min-width:0;flex:1;">' +
               '<div style="font-weight:600;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(tx.from_account_name) + ' &rarr; ' + escHtml(tx.to_account_name) + '</div>' +
               '<div style="font-size:0.74rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(fmtDate(tx.posting_date)) + (tx.description ? ' &bull; ' + escHtml(tx.description) : '') + '</div>' +
             '</div>' +
             '<div style="display:flex;align-items:center;gap:0.45rem;flex-shrink:0;">' +
-              '<span class="tx-badge tx-badge-' + escHtml(tx.tx_type) + '">' + escHtml(tx.tx_type) + '</span>' +
+              txBadgeHtml(tx.type || tx.tx_type) +
               '<strong class="tx-amt" style="font-size:0.88rem;">' + fmtInr(tx.amount) + '</strong>' +
             '</div>' +
-          '</div>'
-        ).join('');
+          '</div>';
+        }).join('');
       } catch (e) { console.error('Recent tx error', e); }
     }
 
@@ -3914,14 +4055,15 @@
           listEl.innerHTML = '<div style="background:white;border:1px solid var(--border-color);border-radius:12px;padding:2rem;text-align:center;color:var(--text-muted);">No matching transactions found.</div>';
         } else {
           const frag = data.items.map(tx => {
+            txCacheByVoucher[tx.name] = tx;
             const delBtn = CAN_WRITE
-              ? '<button type="button" class="btn btn-danger-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" data-vno="' + escHtml(tx.name) + '" onclick="deleteTransaction(this.dataset.vno)">Cancel</button>'
+              ? '<button type="button" class="btn btn-danger-outline" style="padding:0.25rem 0.55rem;font-size:0.75rem;" data-vno="' + escHtml(tx.name) + '" onclick="event.stopPropagation(); deleteTransaction(this.dataset.vno)">Cancel</button>'
               : '';
             const attBadge = tx.attachments_count > 0 ? ' &bull; ' + tx.attachments_count + ' file(s)' : '';
-            return '<div class="tx-card">' +
+            return '<div class="tx-card clickable-tx-row" data-voucher="' + escHtml(tx.name) + '" onclick="openTxDetailModal(this.dataset.voucher)">' +
               '<div style="flex:1 1 260px;">' +
-                '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">' +
-                  '<span class="tx-badge tx-badge-' + escHtml(tx.tx_type) + '">' + escHtml(tx.tx_type) + '</span>' +
+                '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;flex-wrap:wrap;">' +
+                  txBadgeHtml(tx.type || tx.tx_type) +
                   '<span style="font-size:0.8rem;color:var(--text-muted);">' + escHtml(fmtDate(tx.posting_date)) + ' &bull; ' + escHtml(tx.name) + attBadge + '</span>' +
                 '</div>' +
                 '<div style="font-weight:600;font-size:0.9rem;">' + escHtml(tx.from_account_name) + ' &rarr; ' + escHtml(tx.to_account_name) + '</div>' +
@@ -3968,6 +4110,147 @@
         loadTransactions(false);
       } catch (e) {
         showToast('Error cancelling transaction', 'error');
+      }
+    }
+
+    let currentDetailVoucher = '';
+
+    function closeTxDetailModal() {
+      const m = document.getElementById('tx-detail-modal');
+      if (m) m.classList.remove('open');
+    }
+
+    function cancelTxDetailEdit() {
+      document.getElementById('tx-detail-edit').style.display = 'none';
+      document.getElementById('tx-detail-view').style.display = 'block';
+    }
+
+    function openTxDetailModal(voucherNo) {
+      const tx = txCacheByVoucher[voucherNo];
+      if (!tx) return;
+      currentDetailVoucher = voucherNo;
+      cancelTxDetailEdit();
+
+      document.getElementById('txd-badge').innerHTML = txBadgeHtml(tx.type || tx.tx_type);
+      document.getElementById('txd-date').textContent = fmtDate(tx.posting_date);
+      document.getElementById('txd-voucher').textContent = tx.voucher || tx.name;
+      document.getElementById('txd-amount').textContent = fmtInr(tx.amount);
+      document.getElementById('txd-from').textContent = (tx.from_account_name || '-') + (tx.from_account && tx.from_account !== tx.from_account_name ? ' (' + tx.from_account + ')' : '');
+      document.getElementById('txd-to').textContent = (tx.to_account_name || '-') + (tx.to_account && tx.to_account !== tx.to_account_name ? ' (' + tx.to_account + ')' : '');
+      document.getElementById('txd-desc').textContent = tx.description || '-';
+
+      const tagsEl = document.getElementById('txd-tags');
+      const tags = tx.tags || [];
+      tagsEl.innerHTML = tags.length
+        ? tags.map(t => '<span class="tag-pill" style="margin-right:0.25rem;">' + escHtml(t) + '</span>').join('')
+        : '<span style="color:var(--text-muted);font-weight:400;">None</span>';
+
+      const actWrap = document.getElementById('txd-write-actions');
+      if (actWrap) actWrap.style.display = CAN_WRITE ? 'flex' : 'none';
+
+      document.getElementById('tx-detail-modal').classList.add('open');
+    }
+
+    function _fillAllCompanyAccountOptions(selEl, selectedVal) {
+      const opts = formOptionsCache || {};
+      const allAccts = []
+        .concat(opts.bank_cash || [])
+        .concat(opts.expense || [])
+        .concat(opts.income || [])
+        .concat(opts.other_assets_liabilities || []);
+      const seen = new Set();
+      const unique = allAccts.filter(a => {
+        if (!a || !a.name || seen.has(a.name)) return false;
+        seen.add(a.name);
+        return true;
+      }).sort((a, b) => (a.account_name || a.name).localeCompare(b.account_name || b.name));
+      if (selectedVal && !seen.has(selectedVal)) {
+        unique.unshift({ name: selectedVal, account_name: selectedVal });
+      }
+      selEl.innerHTML = unique.map(a =>
+        '<option value="' + escHtml(a.name) + '"' + (a.name === selectedVal ? ' selected' : '') + '>' + escHtml(a.account_name || a.name) + '</option>'
+      ).join('');
+    }
+
+    async function switchTxDetailToEdit() {
+      const tx = txCacheByVoucher[currentDetailVoucher];
+      if (!tx) return;
+      await ensureFormOptions();
+
+      document.getElementById('txd-edit-voucher').value = tx.name;
+      document.getElementById('txd-edit-date').value = tx.posting_date || '';
+      document.getElementById('txd-edit-date-disp').textContent = tx.posting_date ? '(' + fmtDate(tx.posting_date) + ')' : '';
+      document.getElementById('txd-edit-amount').value = tx.amount || '';
+      document.getElementById('txd-edit-desc').value = tx.description || '';
+      document.getElementById('txd-edit-tags').value = (tx.tags || []).join(', ');
+      _fillAllCompanyAccountOptions(document.getElementById('txd-edit-from'), tx.source_account || tx.from_account || '');
+      _fillAllCompanyAccountOptions(document.getElementById('txd-edit-to'), tx.destination_account || tx.to_account || '');
+
+      document.getElementById('tx-detail-view').style.display = 'none';
+      document.getElementById('tx-detail-edit').style.display = 'block';
+    }
+
+    async function saveTxDetailEdit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('txd-edit-submit');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.update_transaction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            voucher: document.getElementById('txd-edit-voucher').value,
+            posting_date: document.getElementById('txd-edit-date').value,
+            amount: document.getElementById('txd-edit-amount').value,
+            source_account: document.getElementById('txd-edit-from').value,
+            destination_account: document.getElementById('txd-edit-to').value,
+            description: document.getElementById('txd-edit-desc').value,
+            tags: document.getElementById('txd-edit-tags').value
+          })
+        });
+        const json = await res.json();
+        if (!res.ok || json.exc || !json.message || !json.message.ok) {
+          showToast('Failed to update transaction', 'error');
+          return;
+        }
+        closeTxDetailModal();
+        showToast('Updated transaction ' + json.message.voucher, 'success');
+        loadDashboard();
+        loadRecentTransactions();
+        loadTransactions(false);
+      } catch (err) {
+        showToast('Error updating transaction', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+      }
+    }
+
+    async function deleteFromTxDetailModal() {
+      const vno = currentDetailVoucher;
+      if (!vno) return;
+      if (!confirm('Delete transaction ' + vno + '? This will cancel and reverse its ledger entries.')) return;
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.delete_transaction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify({ voucher: vno })
+        });
+        const json = await res.json();
+        if (!res.ok || json.exc || !json.message || !json.message.ok) {
+          showToast('Failed to delete transaction', 'error');
+          return;
+        }
+        closeTxDetailModal();
+        showToast('Deleted ' + vno, 'success');
+        loadDashboard();
+        loadRecentTransactions();
+        loadTransactions(false);
+      } catch (err) {
+        showToast('Error deleting transaction', 'error');
       }
     }
 
@@ -4139,7 +4422,7 @@
         const isTodo = meta && meta.is_todo;
         const cls = isTodo ? 'tag-pill tag-pill-todo' : 'tag-pill';
         const rm = CAN_WRITE
-          ? ' <span style="cursor:pointer;margin-left:0.15rem;" data-vno="' + escHtml(voucherNo) + '" data-tag="' + escHtml(tag) + '" data-act="remove" onclick="toggleTxTag(this.dataset.vno,this.dataset.tag,this.dataset.act)">&times;</span>'
+          ? ' <span style="cursor:pointer;margin-left:0.15rem;" data-vno="' + escHtml(voucherNo) + '" data-tag="' + escHtml(tag) + '" data-act="remove" onclick="event.stopPropagation(); toggleTxTag(this.dataset.vno,this.dataset.tag,this.dataset.act)">&times;</span>'
           : '';
         return '<span class="' + cls + '">' + escHtml(tag) + rm + '</span>';
       }).join('') + '</div>';
