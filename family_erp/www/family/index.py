@@ -482,43 +482,12 @@ def _populate_balance_sheet(context, company, to_date):
 	net_worth = total_assets - total_liabilities
 
 	company_abbr = frappe.db.get_value("Company", company, "abbr") or ""
-	suffix = f" - {company_abbr}" if company_abbr else ""
-
-	def _group_bs_items(items, prefix):
-		grouped = {}
-		for it in items:
-			raw_parent = it.get("parent_account") or ""
-			if raw_parent and suffix and raw_parent.endswith(suffix):
-				cat = raw_parent[: -len(suffix)].strip()
-			elif raw_parent:
-				cat = raw_parent.strip()
-			else:
-				cat = "Uncategorized"
-			grouped.setdefault(cat, []).append(it)
-
-		sorted_cats = sorted(grouped.keys(), key=lambda s: s.lower())
-		default_expanded = len(sorted_cats) <= 2
-		out = []
-		for idx, cat in enumerate(sorted_cats):
-			accts = sorted(grouped[cat], key=lambda x: (x.get("account_name") or "").lower())
-			grp_total = sum(a["balance"] for a in accts)
-			out.append({
-				"group_id": f"{prefix}-{idx}",
-				"category": cat,
-				"accounts": accts,
-				"count": len(accts),
-				"group_total": grp_total,
-				"group_total_formatted": fmt_inr(grp_total),
-				"default_expanded": default_expanded,
-			})
-		return out
-
 	context["bs_assets"] = bs_assets
 	context["bs_liabilities"] = bs_liabilities
 	context["bs_equity"] = bs_equity
-	context["bs_asset_groups"] = _group_bs_items(bs_assets, "bs-asset")
-	context["bs_liability_groups"] = _group_bs_items(bs_liabilities, "bs-liab")
-	context["bs_equity_groups"] = _group_bs_items(bs_equity, "bs-eq")
+	context["bs_asset_groups"] = _group_report_items(bs_assets, company_abbr, "bs-asset", "balance")
+	context["bs_liability_groups"] = _group_report_items(bs_liabilities, company_abbr, "bs-liab", "balance")
+	context["bs_equity_groups"] = _group_report_items(bs_equity, company_abbr, "bs-eq", "balance")
 	context["bs_total_assets"] = total_assets
 	context["bs_total_liabilities"] = total_liabilities
 	context["bs_total_equity"] = total_equity
@@ -580,14 +549,49 @@ def _populate_income_expenditure(context, company, from_date, to_date):
 	total_expense = sum(r["amount"] for r in ie_expense)
 	net_surplus = total_income - total_expense
 
+	company_abbr = frappe.db.get_value("Company", company, "abbr") or ""
 	context["ie_income"] = ie_income
 	context["ie_expense"] = ie_expense
+	context["ie_income_groups"] = _group_report_items(ie_income, company_abbr, "ie-inc", "amount")
+	context["ie_expense_groups"] = _group_report_items(ie_expense, company_abbr, "ie-exp", "amount")
 	context["ie_total_income"] = total_income
 	context["ie_total_expense"] = total_expense
 	context["ie_net_surplus"] = net_surplus
 	context["ie_total_income_formatted"] = fmt_inr(total_income)
 	context["ie_total_expense_formatted"] = fmt_inr(total_expense)
 	context["ie_net_surplus_formatted"] = fmt_inr(net_surplus)
+
+
+def _group_report_items(items, company_abbr, prefix, value_key="balance"):
+	"""Groups report rows by parent_account (stripped of company abbr) with subtotals."""
+	suffix = f" - {company_abbr}" if company_abbr else ""
+	grouped = {}
+	for it in items:
+		raw_parent = it.get("parent_account") or ""
+		if raw_parent and suffix and raw_parent.endswith(suffix):
+			cat = raw_parent[: -len(suffix)].strip()
+		elif raw_parent:
+			cat = raw_parent.strip()
+		else:
+			cat = "Uncategorized"
+		grouped.setdefault(cat, []).append(it)
+
+	sorted_cats = sorted(grouped.keys(), key=lambda s: s.lower())
+	default_expanded = len(sorted_cats) <= 2
+	out = []
+	for idx, cat in enumerate(sorted_cats):
+		accts = sorted(grouped[cat], key=lambda x: (x.get("account_name") or "").lower())
+		grp_total = sum(flt(a.get(value_key)) for a in accts)
+		out.append({
+			"group_id": f"{prefix}-{idx}",
+			"category": cat,
+			"accounts": accts,
+			"count": len(accts),
+			"group_total": grp_total,
+			"group_total_formatted": fmt_inr(grp_total),
+			"default_expanded": default_expanded,
+		})
+	return out
 
 
 def fmt_inr(amount):

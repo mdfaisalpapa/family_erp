@@ -1259,13 +1259,13 @@
     }
 
     /* Collapsible Balance Sheet Category Groups */
-    .bs-group-header {
+    .bs-group-header, .ie-group-header {
       background: #f8fafc;
       cursor: pointer;
       user-select: none;
       transition: background 0.12s ease;
     }
-    .bs-group-header:hover { background: #f1f5f9 !important; }
+    .bs-group-header:hover, .ie-group-header:hover { background: #f1f5f9 !important; }
     .bs-chevron {
       display: inline-block;
       font-size: 0.85rem;
@@ -1273,7 +1273,8 @@
       margin-right: 0.45rem;
       transition: transform 0.15s ease;
     }
-    .bs-group-header[data-expanded="true"] .bs-chevron {
+    .bs-group-header[data-expanded="true"] .bs-chevron,
+    .ie-group-header[data-expanded="true"] .bs-chevron {
       transform: rotate(90deg);
       color: var(--primary);
     }
@@ -1287,7 +1288,8 @@
       background: #e2e8f0;
       color: #475569;
     }
-    .bs-group-child td:first-child {
+    .bs-group-child td:first-child,
+    .ie-group-child td:first-child {
       padding-left: 2.15rem;
     }
   </style>
@@ -1769,7 +1771,7 @@
 
     <!-- Tab: Income & Expenditure -->
     <div id="tab-income-expense" class="sub-panel">
-      <section class="balance-card" style="margin-bottom: 1.25rem;">
+      <section class="balance-card" style="margin-bottom: 1rem;">
         <div class="balance-info">
           <span class="badge-status {% if ie_net_surplus >= 0 %}badge-credit{% else %}badge-payable{% endif %}">
             {% if ie_net_surplus >= 0 %}Net Surplus{% else %}Net Deficit{% endif %}
@@ -1789,6 +1791,10 @@
         </div>
       </section>
 
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
+        <button type="button" id="ie-toggle-all-btn" class="btn btn-outline" style="padding: 0.34rem 0.75rem; font-size: 0.78rem;" onclick="toggleAllIeGroups()">Expand All</button>
+      </div>
+
       <div class="report-grid">
         <div>
           <h3 class="section-heading">Income</h3>
@@ -1796,21 +1802,26 @@
             <table class="statement-table">
               <thead>
                 <tr>
-                  <th>Account</th>
-                  <th class="num" style="width: 150px;">Amount</th>
+                  <th>Category / Account</th>
+                  <th class="num" style="width: 160px;">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {% for row in ie_income %}
-                <tr>
+                {% for grp in ie_income_groups %}
+                <tr class="ie-group-header" data-group="{{ grp.group_id }}" data-expanded="{{ 'true' if grp.default_expanded else 'false' }}" onclick="toggleIeGroup(this)">
                   <td>
-                    <div style="font-weight: 500;">{{ row.account_name }}</div>
-                    {% if row.parent_account %}
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
-                    {% endif %}
+                    <span class="bs-chevron">&#9656;</span>
+                    <strong>{{ grp.category }}</strong>
+                    <span class="bs-count-badge">{{ grp.count }}</span>
                   </td>
-                  <td class="num" style="font-weight: 600;">{{ row.amount_formatted }}</td>
+                  <td class="num"><strong>{{ grp.group_total_formatted }}</strong></td>
                 </tr>
+                {% for row in grp.accounts %}
+                <tr class="ie-group-child" data-parent="{{ grp.group_id }}" {% if not grp.default_expanded %}style="display: none;"{% endif %}>
+                  <td>{{ row.account_name }}</td>
+                  <td class="num">{{ row.amount_formatted }}</td>
+                </tr>
+                {% endfor %}
                 {% else %}
                 <tr>
                   <td colspan="2" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No income recorded in this period.</td>
@@ -1833,21 +1844,26 @@
             <table class="statement-table">
               <thead>
                 <tr>
-                  <th>Account</th>
-                  <th class="num" style="width: 150px;">Amount</th>
+                  <th>Category / Account</th>
+                  <th class="num" style="width: 160px;">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {% for row in ie_expense %}
-                <tr>
+                {% for grp in ie_expense_groups %}
+                <tr class="ie-group-header" data-group="{{ grp.group_id }}" data-expanded="{{ 'true' if grp.default_expanded else 'false' }}" onclick="toggleIeGroup(this)">
                   <td>
-                    <div style="font-weight: 500;">{{ row.account_name }}</div>
-                    {% if row.parent_account %}
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
-                    {% endif %}
+                    <span class="bs-chevron">&#9656;</span>
+                    <strong>{{ grp.category }}</strong>
+                    <span class="bs-count-badge">{{ grp.count }}</span>
                   </td>
-                  <td class="num" style="font-weight: 600;">{{ row.amount_formatted }}</td>
+                  <td class="num"><strong>{{ grp.group_total_formatted }}</strong></td>
                 </tr>
+                {% for row in grp.accounts %}
+                <tr class="ie-group-child" data-parent="{{ grp.group_id }}" {% if not grp.default_expanded %}style="display: none;"{% endif %}>
+                  <td>{{ row.account_name }}</td>
+                  <td class="num">{{ row.amount_formatted }}</td>
+                </tr>
+                {% endfor %}
                 {% else %}
                 <tr>
                   <td colspan="2" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No expenditure recorded in this period.</td>
@@ -3821,6 +3837,34 @@
       syncBsToggleAllLabel();
     }
 
+    function syncIeToggleAllLabel() {
+      const btn = document.getElementById('ie-toggle-all-btn');
+      if (!btn) return;
+      const hasCollapsed = !!document.querySelector('.ie-group-header[data-expanded="false"]');
+      btn.textContent = hasCollapsed ? 'Expand All' : 'Collapse All';
+    }
+
+    function setIeGroupExpanded(headerRow, expand) {
+      const groupId = headerRow.dataset.group;
+      headerRow.dataset.expanded = expand ? 'true' : 'false';
+      document.querySelectorAll('.ie-group-child[data-parent="' + groupId + '"]').forEach(tr => {
+        tr.style.display = expand ? '' : 'none';
+      });
+    }
+
+    function toggleIeGroup(headerRow) {
+      const isExpanded = headerRow.dataset.expanded === 'true';
+      setIeGroupExpanded(headerRow, !isExpanded);
+      syncIeToggleAllLabel();
+    }
+
+    function toggleAllIeGroups() {
+      const headers = document.querySelectorAll('.ie-group-header');
+      const expandAll = !!document.querySelector('.ie-group-header[data-expanded="false"]');
+      headers.forEach(h => setIeGroupExpanded(h, expandAll));
+      syncIeToggleAllLabel();
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       const qs = new URLSearchParams(window.location.search);
       if (qs.has('account') || qs.has('from_date') || qs.has('to_date')) {
@@ -3835,6 +3879,7 @@
       loadBudgets();
       loadTransactions(false);
       syncBsToggleAllLabel();
+      syncIeToggleAllLabel();
     });
   </script>
 </body>
