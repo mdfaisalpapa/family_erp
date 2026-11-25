@@ -1257,6 +1257,39 @@
       .hero-metrics-row { gap: 0.5rem; }
       .hero-metric-val { font-size: 0.92rem; }
     }
+
+    /* Collapsible Balance Sheet Category Groups */
+    .bs-group-header {
+      background: #f8fafc;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s ease;
+    }
+    .bs-group-header:hover { background: #f1f5f9 !important; }
+    .bs-chevron {
+      display: inline-block;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-right: 0.45rem;
+      transition: transform 0.15s ease;
+    }
+    .bs-group-header[data-expanded="true"] .bs-chevron {
+      transform: rotate(90deg);
+      color: var(--primary);
+    }
+    .bs-count-badge {
+      display: inline-block;
+      margin-left: 0.4rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: #e2e8f0;
+      color: #475569;
+    }
+    .bs-group-child td:first-child {
+      padding-left: 2.15rem;
+    }
   </style>
 </head>
 <body>
@@ -1581,7 +1614,7 @@
 
     <!-- Tab: Balance Sheet -->
     <div id="tab-balance-sheet" class="sub-panel">
-      <section class="balance-card" style="margin-bottom: 1.25rem;">
+      <section class="balance-card" style="margin-bottom: 1rem;">
         <div class="balance-info">
           <span class="badge-status badge-credit">Balance Sheet</span>
           <div class="balance-amount">{{ bs_net_worth_formatted }}</div>
@@ -1605,6 +1638,10 @@
         </div>
       </section>
 
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;">
+        <button type="button" id="bs-toggle-all-btn" class="btn btn-outline" style="padding: 0.34rem 0.75rem; font-size: 0.78rem;" onclick="toggleAllBsGroups()">Expand All</button>
+      </div>
+
       <div class="report-grid">
         <div>
           <h3 class="section-heading">Assets</h3>
@@ -1612,21 +1649,26 @@
             <table class="statement-table">
               <thead>
                 <tr>
-                  <th>Account</th>
-                  <th class="num" style="width: 150px;">Balance</th>
+                  <th>Category / Account</th>
+                  <th class="num" style="width: 160px;">Balance</th>
                 </tr>
               </thead>
               <tbody>
-                {% for row in bs_assets %}
-                <tr>
+                {% for grp in bs_asset_groups %}
+                <tr class="bs-group-header" data-group="{{ grp.group_id }}" data-expanded="{{ 'true' if grp.default_expanded else 'false' }}" onclick="toggleBsGroup(this)">
                   <td>
-                    <div style="font-weight: 500;">{{ row.account_name }}</div>
-                    {% if row.parent_account %}
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
-                    {% endif %}
+                    <span class="bs-chevron">&#9656;</span>
+                    <strong>{{ grp.category }}</strong>
+                    <span class="bs-count-badge">{{ grp.count }}</span>
                   </td>
-                  <td class="num" style="font-weight: 600;">{{ row.balance_formatted }}</td>
+                  <td class="num"><strong>{{ grp.group_total_formatted }}</strong></td>
                 </tr>
+                {% for row in grp.accounts %}
+                <tr class="bs-group-child" data-parent="{{ grp.group_id }}" {% if not grp.default_expanded %}style="display: none;"{% endif %}>
+                  <td>{{ row.account_name }}</td>
+                  <td class="num">{{ row.balance_formatted }}</td>
+                </tr>
+                {% endfor %}
                 {% else %}
                 <tr>
                   <td colspan="2" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No asset balances recorded as of {{ to_date }}.</td>
@@ -1649,21 +1691,26 @@
             <table class="statement-table">
               <thead>
                 <tr>
-                  <th>Account</th>
-                  <th class="num" style="width: 150px;">Balance</th>
+                  <th>Category / Account</th>
+                  <th class="num" style="width: 160px;">Balance</th>
                 </tr>
               </thead>
               <tbody>
-                {% for row in bs_liabilities %}
-                <tr>
+                {% for grp in bs_liability_groups %}
+                <tr class="bs-group-header" data-group="{{ grp.group_id }}" data-expanded="{{ 'true' if grp.default_expanded else 'false' }}" onclick="toggleBsGroup(this)">
                   <td>
-                    <div style="font-weight: 500;">{{ row.account_name }}</div>
-                    {% if row.parent_account %}
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
-                    {% endif %}
+                    <span class="bs-chevron">&#9656;</span>
+                    <strong>{{ grp.category }}</strong>
+                    <span class="bs-count-badge">{{ grp.count }}</span>
                   </td>
-                  <td class="num" style="font-weight: 600;">{{ row.balance_formatted }}</td>
+                  <td class="num"><strong>{{ grp.group_total_formatted }}</strong></td>
                 </tr>
+                {% for row in grp.accounts %}
+                <tr class="bs-group-child" data-parent="{{ grp.group_id }}" {% if not grp.default_expanded %}style="display: none;"{% endif %}>
+                  <td>{{ row.account_name }}</td>
+                  <td class="num">{{ row.balance_formatted }}</td>
+                </tr>
+                {% endfor %}
                 {% else %}
                 <tr>
                   <td colspan="2" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No liability balances recorded as of {{ to_date }}.</td>
@@ -1679,27 +1726,32 @@
             </table>
           </div>
 
-          {% if bs_equity %}
+          {% if bs_equity_groups %}
           <h3 class="section-heading">Equity</h3>
           <div class="table-container">
             <table class="statement-table">
               <thead>
                 <tr>
-                  <th>Account</th>
-                  <th class="num" style="width: 150px;">Balance</th>
+                  <th>Category / Account</th>
+                  <th class="num" style="width: 160px;">Balance</th>
                 </tr>
               </thead>
               <tbody>
-                {% for row in bs_equity %}
-                <tr>
+                {% for grp in bs_equity_groups %}
+                <tr class="bs-group-header" data-group="{{ grp.group_id }}" data-expanded="{{ 'true' if grp.default_expanded else 'false' }}" onclick="toggleBsGroup(this)">
                   <td>
-                    <div style="font-weight: 500;">{{ row.account_name }}</div>
-                    {% if row.parent_account %}
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.parent_account }}</div>
-                    {% endif %}
+                    <span class="bs-chevron">&#9656;</span>
+                    <strong>{{ grp.category }}</strong>
+                    <span class="bs-count-badge">{{ grp.count }}</span>
                   </td>
-                  <td class="num" style="font-weight: 600;">{{ row.balance_formatted }}</td>
+                  <td class="num"><strong>{{ grp.group_total_formatted }}</strong></td>
                 </tr>
+                {% for row in grp.accounts %}
+                <tr class="bs-group-child" data-parent="{{ grp.group_id }}" {% if not grp.default_expanded %}style="display: none;"{% endif %}>
+                  <td>{{ row.account_name }}</td>
+                  <td class="num">{{ row.balance_formatted }}</td>
+                </tr>
+                {% endfor %}
                 {% endfor %}
               </tbody>
               <tfoot>
@@ -3741,6 +3793,34 @@
       navigator.serviceWorker.register('/family/sw.js').catch(() => {});
     }
 
+    function syncBsToggleAllLabel() {
+      const btn = document.getElementById('bs-toggle-all-btn');
+      if (!btn) return;
+      const hasCollapsed = !!document.querySelector('.bs-group-header[data-expanded="false"]');
+      btn.textContent = hasCollapsed ? 'Expand All' : 'Collapse All';
+    }
+
+    function setBsGroupExpanded(headerRow, expand) {
+      const groupId = headerRow.dataset.group;
+      headerRow.dataset.expanded = expand ? 'true' : 'false';
+      document.querySelectorAll('.bs-group-child[data-parent="' + groupId + '"]').forEach(tr => {
+        tr.style.display = expand ? '' : 'none';
+      });
+    }
+
+    function toggleBsGroup(headerRow) {
+      const isExpanded = headerRow.dataset.expanded === 'true';
+      setBsGroupExpanded(headerRow, !isExpanded);
+      syncBsToggleAllLabel();
+    }
+
+    function toggleAllBsGroups() {
+      const headers = document.querySelectorAll('.bs-group-header');
+      const expandAll = !!document.querySelector('.bs-group-header[data-expanded="false"]');
+      headers.forEach(h => setBsGroupExpanded(h, expandAll));
+      syncBsToggleAllLabel();
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       const qs = new URLSearchParams(window.location.search);
       if (qs.has('account') || qs.has('from_date') || qs.has('to_date')) {
@@ -3754,6 +3834,7 @@
       loadAccountsOverview();
       loadBudgets();
       loadTransactions(false);
+      syncBsToggleAllLabel();
     });
   </script>
 </body>

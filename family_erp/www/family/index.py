@@ -481,9 +481,44 @@ def _populate_balance_sheet(context, company, to_date):
 	total_equity = sum(r["balance"] for r in bs_equity)
 	net_worth = total_assets - total_liabilities
 
+	company_abbr = frappe.db.get_value("Company", company, "abbr") or ""
+	suffix = f" - {company_abbr}" if company_abbr else ""
+
+	def _group_bs_items(items, prefix):
+		grouped = {}
+		for it in items:
+			raw_parent = it.get("parent_account") or ""
+			if raw_parent and suffix and raw_parent.endswith(suffix):
+				cat = raw_parent[: -len(suffix)].strip()
+			elif raw_parent:
+				cat = raw_parent.strip()
+			else:
+				cat = "Uncategorized"
+			grouped.setdefault(cat, []).append(it)
+
+		sorted_cats = sorted(grouped.keys(), key=lambda s: s.lower())
+		default_expanded = len(sorted_cats) <= 2
+		out = []
+		for idx, cat in enumerate(sorted_cats):
+			accts = sorted(grouped[cat], key=lambda x: (x.get("account_name") or "").lower())
+			grp_total = sum(a["balance"] for a in accts)
+			out.append({
+				"group_id": f"{prefix}-{idx}",
+				"category": cat,
+				"accounts": accts,
+				"count": len(accts),
+				"group_total": grp_total,
+				"group_total_formatted": fmt_inr(grp_total),
+				"default_expanded": default_expanded,
+			})
+		return out
+
 	context["bs_assets"] = bs_assets
 	context["bs_liabilities"] = bs_liabilities
 	context["bs_equity"] = bs_equity
+	context["bs_asset_groups"] = _group_bs_items(bs_assets, "bs-asset")
+	context["bs_liability_groups"] = _group_bs_items(bs_liabilities, "bs-liab")
+	context["bs_equity_groups"] = _group_bs_items(bs_equity, "bs-eq")
 	context["bs_total_assets"] = total_assets
 	context["bs_total_liabilities"] = total_liabilities
 	context["bs_total_equity"] = total_equity
