@@ -20,7 +20,7 @@
   },
   {
    "fieldname": "trigger_value",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "in_list_view": 1,
    "label": "Trigger Value",
    "reqd": 1

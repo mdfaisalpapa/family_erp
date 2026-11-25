@@ -144,7 +144,12 @@ def _normalize_tags(raw_tags):
 	return seen
 
 
-def _evaluate_trigger(trigger, payload):
+def _pipe_tokens(raw_val):
+	"""Splits pipe-separated OR keywords, stripping whitespace and ignoring empty tokens."""
+	return [tok.strip().lower() for tok in raw_val.split("|") if tok.strip()]
+
+
+def _match_trigger(trigger, payload):
 	t_type = (trigger.get("trigger_type") or "").strip()
 	raw_val = "" if trigger.get("trigger_value") is None else str(trigger.get("trigger_value")).strip()
 	val_l = raw_val.lower()
@@ -161,19 +166,23 @@ def _evaluate_trigger(trigger, payload):
 	if t_type == "transaction_type":
 		matched = tx_type == val_l
 	elif t_type == "description_contains":
-		matched = bool(val_l) and (val_l in desc_l)
+		tokens = _pipe_tokens(raw_val)
+		matched = any(tok in desc_l for tok in tokens)
 	elif t_type == "description_is":
 		matched = desc_l == val_l
 	elif t_type == "description_starts":
-		matched = bool(val_l) and desc_l.startswith(val_l)
+		tokens = _pipe_tokens(raw_val)
+		matched = any(desc_l.startswith(tok) for tok in tokens)
 	elif t_type == "description_ends":
-		matched = bool(val_l) and desc_l.endswith(val_l)
+		tokens = _pipe_tokens(raw_val)
+		matched = any(desc_l.endswith(tok) for tok in tokens)
 	elif t_type == "source_account_is":
 		matched = src_acct == val_l
 	elif t_type == "destination_account_is":
 		matched = dst_acct == val_l
 	elif t_type == "notes_contains":
-		matched = bool(val_l) and (val_l in notes_l)
+		tokens = _pipe_tokens(raw_val)
+		matched = any(tok in notes_l for tok in tokens)
 	elif t_type == "amount_is":
 		amt_raw = payload.get("amount")
 		if amt_raw is not None and raw_val:
@@ -188,13 +197,16 @@ def _evaluate_trigger(trigger, payload):
 	return (not matched) if negated else matched
 
 
+_evaluate_trigger = _match_trigger
+
+
 def _rule_matches(rule, payload):
 	triggers = rule.get("triggers") or []
 	if not triggers:
 		return False
 	if cint(rule.get("match_all", 1)):
-		return all(_evaluate_trigger(t, payload) for t in triggers)
-	return any(_evaluate_trigger(t, payload) for t in triggers)
+		return all(_match_trigger(t, payload) for t in triggers)
+	return any(_match_trigger(t, payload) for t in triggers)
 
 
 def _apply_rule_actions(rule, payload):
