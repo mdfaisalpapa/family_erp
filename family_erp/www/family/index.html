@@ -1039,7 +1039,7 @@
       cursor: pointer;
     }
     @media print {
-      #tab-accounts-budgets, #tab-settings, #adjust-balance-modal, #budget-modal { display: none !important; }
+      #tab-accounts-budgets, #tab-settings, #adjust-balance-modal, #budget-modal, #rule-dryrun-modal { display: none !important; }
     }
 
     /* Clean Bookkeeping Redesign */
@@ -1775,6 +1775,207 @@
       .ie-pie-grid { grid-template-columns: 1fr; gap: 1rem; }
       .ie-pie-wrap { flex-direction: column; align-items: stretch; }
       .ie-pie-svg { margin: 0 auto; }
+    }
+
+    /* Automation Rules Section & Dry-Run Modal */
+    .rules-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.9rem;
+    }
+    .rules-group-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+    .rule-group-card {
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    .rule-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      padding: 0.72rem 0.9rem;
+      background: #f8fafc;
+      cursor: pointer;
+      user-select: none;
+    }
+    .rule-group-header:hover { background: #f1f5f9; }
+    .rule-group-left {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+      flex: 1;
+    }
+    .rule-group-chevron {
+      display: inline-block;
+      transition: transform 0.15s ease;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .rule-group-card[data-expanded="true"] .rule-group-chevron {
+      transform: rotate(90deg);
+    }
+    .rule-group-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text-main);
+      overflow-wrap: anywhere;
+    }
+    .rule-group-body {
+      display: none;
+      padding: 0.7rem 0.85rem;
+      border-top: 1px solid #f1f5f9;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .rule-group-card[data-expanded="true"] .rule-group-body {
+      display: flex;
+    }
+    .rule-item-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.72rem 0.82rem;
+      background: #ffffff;
+      min-width: 0;
+    }
+    .rule-item-card.is-inactive {
+      opacity: 0.6;
+      background: #f8fafc;
+    }
+    .rule-item-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.48rem;
+    }
+    .rule-item-title-wrap {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      min-width: 0;
+      flex: 1 1 220px;
+    }
+    .rule-item-title {
+      font-weight: 700;
+      font-size: 0.86rem;
+      color: var(--text-main);
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .rule-item-actions-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-shrink: 0;
+    }
+    .rule-meta-pill {
+      display: inline-block;
+      padding: 0.1rem 0.42rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      background: #eef2ff;
+      color: #3730a3;
+    }
+    .rule-meta-pill.stop {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .rule-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.32rem;
+      font-size: 0.76rem;
+    }
+    .rule-chip-prefix {
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      margin-right: 0.1rem;
+    }
+    .rule-chip {
+      display: inline-block;
+      padding: 0.18rem 0.52rem;
+      border-radius: 8px;
+      background: #f1f5f9;
+      color: var(--text-main);
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.3;
+    }
+    .rule-chip.action {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    .rule-chip.action.skip {
+      background: #fef2f2;
+      color: #991b1b;
+      border-color: #fecaca;
+    }
+    .switch-toggle {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .switch-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #cbd5e1;
+      transition: 0.2s;
+      border-radius: 999px;
+    }
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #ffffff;
+      transition: 0.2s;
+      border-radius: 50%;
+    }
+    .switch-toggle input:checked + .switch-slider { background-color: var(--primary); }
+    .switch-toggle input:checked + .switch-slider:before { transform: translateX(16px); }
+    .switch-toggle input:disabled + .switch-slider { opacity: 0.5; cursor: not-allowed; }
+    .dryrun-row {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.65rem 0.8rem;
+      background: #f8fafc;
+      margin-bottom: 0.55rem;
+    }
+    @media (max-width: 768px) {
+      .rule-group-header { padding: 0.65rem 0.72rem; }
+      .rule-group-body { padding: 0.55rem 0.6rem; }
+      .rule-item-card { padding: 0.62rem 0.65rem; }
+      #rules-search-input { width: 100%; min-width: 0 !important; }
     }
   </style>
 </head>
@@ -2629,6 +2830,22 @@
           </div>
         </form>
       </div>
+
+      <div class="panel-card" id="settings-rules-card" style="margin-top: 1.25rem;">
+        <div class="panel-header" style="flex-wrap: wrap; gap: 0.55rem;">
+          <div style="display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;">
+            <h3 class="panel-title">Automation Rules</h3>
+            <span class="pie-period-badge" id="rules-summary-badge">Loading...</span>
+          </div>
+          <div class="rules-toolbar" style="margin-bottom: 0;">
+            <input type="search" id="rules-search-input" class="date-input" placeholder="Search title, trigger, action..." oninput="filterAutomationRules()" style="min-width: 210px;">
+            <button type="button" id="rules-toggle-all-btn" class="btn btn-outline" style="padding: 0.36rem 0.72rem; font-size: 0.78rem;" onclick="toggleAllRuleGroups()">Expand All</button>
+          </div>
+        </div>
+        <div id="rules-groups-container" class="rules-group-list">
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Open Settings to load automation rules...</div>
+        </div>
+      </div>
     </div>
 
     </div>
@@ -2906,6 +3123,25 @@
   </div>
   {% endif %}
 
+  <!-- Automation Rule Dry-Run Modal -->
+  <div id="rule-dryrun-modal" class="modal-backdrop" onclick="if(event.target===this) closeRuleDryRunModal()">
+    <div class="modal-dialog" style="max-width: 680px; width: 95%;">
+      <div class="modal-header">
+        <div style="min-width: 0; padding-right: 0.5rem;">
+          <h3 id="dryrun-modal-title" style="margin: 0; font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere;">Dry-Run Rule Preview</h3>
+          <div id="dryrun-modal-subtitle" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">Testing against recent transactions...</div>
+        </div>
+        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem; flex-shrink: 0;" onclick="closeRuleDryRunModal()">&times;</button>
+      </div>
+      <div id="dryrun-modal-body" style="max-height: 65vh; overflow-y: auto; padding-right: 0.1rem;">
+        <div style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0;">Running dry-run evaluation...</div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 0.85rem;">
+        <button type="button" class="btn btn-outline" onclick="closeRuleDryRunModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const PORTAL_CSRF_TOKEN = '{{ csrf_token }}';
     const PORTAL_COMPANY = {{ selected_company | tojson }};
@@ -2991,6 +3227,9 @@
       if (subPanel) subPanel.classList.add('active');
       if (subTabId === 'income-expense' && !monthlyTrendCache.length) {
         loadDashboard();
+      }
+      if (subTabId === 'settings' && !rulesLoadedOnce) {
+        loadAutomationRules();
       }
     }
 
@@ -4827,6 +5066,293 @@
       const expandAll = !!document.querySelector('.ie-group-header[data-expanded="false"]');
       headers.forEach(h => setIeGroupExpanded(h, expandAll));
       syncIeToggleAllLabel();
+    }
+
+    let rulesGroupsCache = [];
+    let rulesLoadedOnce = false;
+    const expandedRuleGroups = new Set();
+
+    function _formatTriggerChip(t) {
+      const map = {
+        transaction_type: 'type',
+        description_contains: 'desc has',
+        description_is: 'desc =',
+        description_starts: 'desc starts',
+        description_ends: 'desc ends',
+        source_account_is: 'from',
+        destination_account_is: 'to',
+        notes_contains: 'notes has',
+        amount_is: 'amount =',
+        tag_is: 'tag'
+      };
+      const lbl = map[t.trigger_type] || t.trigger_type;
+      const neg = Number(t.negated) === 1 ? 'NOT ' : '';
+      return neg + lbl + ': ' + (t.trigger_value || '');
+    }
+
+    function _formatActionChip(a) {
+      const at = a.action_type || '';
+      const av = a.action_value || '';
+      if (at === 'skip_transaction') return { text: 'Skip Entry', cls: 'action skip' };
+      if (at === 'convert_transfer') return { text: 'Transfer -> ' + av, cls: 'action' };
+      if (at === 'set_destination_account') return { text: 'To -> ' + av, cls: 'action' };
+      if (at === 'set_source_account') return { text: 'From -> ' + av, cls: 'action' };
+      if (at === 'add_tag') return { text: '+Tag: ' + av, cls: 'action' };
+      if (at === 'remove_all_tags') return { text: 'Clear Tags', cls: 'action' };
+      if (at === 'set_description') return { text: 'Desc = ' + av, cls: 'action' };
+      if (at === 'set_amount') return { text: 'Amount = ' + av, cls: 'action' };
+      return { text: at + (av ? ': ' + av : ''), cls: 'action' };
+    }
+
+    async function loadAutomationRules() {
+      const box = document.getElementById('rules-groups-container');
+      try {
+        const res = await fetch(apiUrl('get_automation_rules'), { credentials: 'same-origin' });
+        const json = await res.json();
+        const data = json.message;
+        if (!data || !data.groups) {
+          if (box) box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Unable to load automation rules.</div>';
+          return;
+        }
+        rulesLoadedOnce = true;
+        rulesGroupsCache = data.groups;
+        renderAutomationRules();
+      } catch (e) {
+        console.error('Load rules error', e);
+        if (box) box.innerHTML = '<div style="color:var(--danger-text);font-size:0.85rem;">Error loading automation rules.</div>';
+      }
+    }
+
+    function _updateRulesSummaryBadge() {
+      const badge = document.getElementById('rules-summary-badge');
+      if (!badge) return;
+      let total = 0, active = 0;
+      rulesGroupsCache.forEach(g => {
+        (g.rules || []).forEach(r => {
+          total += 1;
+          if (Number(r.is_active) === 1 && Number(g.is_active) === 1) active += 1;
+        });
+      });
+      badge.textContent = active + ' active / ' + total + ' total';
+    }
+
+    function renderAutomationRules() {
+      const box = document.getElementById('rules-groups-container');
+      if (!box) return;
+      _updateRulesSummaryBadge();
+
+      const qEl = document.getElementById('rules-search-input');
+      const q = (qEl ? qEl.value : '').trim().toLowerCase();
+
+      if (!rulesGroupsCache.length) {
+        box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No automation rule groups found.</div>';
+        return;
+      }
+
+      let renderedGroups = 0;
+      const html = rulesGroupsCache.map(g => {
+        const allRules = g.rules || [];
+        const matchedRules = !q ? allRules : allRules.filter(r => {
+          if ((r.title || '').toLowerCase().includes(q)) return true;
+          if ((g.title || '').toLowerCase().includes(q)) return true;
+          if ((r.triggers || []).some(t => (t.trigger_value || '').toLowerCase().includes(q) || (t.trigger_type || '').toLowerCase().includes(q))) return true;
+          if ((r.actions || []).some(a => (a.action_value || '').toLowerCase().includes(q) || (a.action_type || '').toLowerCase().includes(q))) return true;
+          return false;
+        });
+
+        if (q && !matchedRules.length) return '';
+        renderedGroups += 1;
+
+        const isExp = q ? true : expandedRuleGroups.has(g.name);
+        const activeInGrp = allRules.filter(r => Number(r.is_active) === 1).length;
+        const disAttr = CAN_WRITE ? '' : ' disabled';
+
+        const rulesHtml = matchedRules.length ? matchedRules.map(r => {
+          const isAct = Number(r.is_active) === 1;
+          const logicPill = '<span class="rule-meta-pill">' + (Number(r.match_all) === 1 ? 'AND' : 'OR') + '</span>';
+          const stopPill = Number(r.stop_processing) === 1 ? '<span class="rule-meta-pill stop">STOP</span>' : '';
+          const trigsHtml = (r.triggers || []).map(t => '<span class="rule-chip">' + escHtml(_formatTriggerChip(t)) + '</span>').join('');
+          const actsHtml = (r.actions || []).map(a => {
+            const fmt = _formatActionChip(a);
+            return '<span class="rule-chip ' + fmt.cls + '">' + escHtml(fmt.text) + '</span>';
+          }).join('');
+
+          return '<div class="rule-item-card' + (isAct ? '' : ' is-inactive') + '">' +
+            '<div class="rule-item-top">' +
+              '<div class="rule-item-title-wrap">' +
+                '<span class="rule-item-title">' + escHtml(r.title) + '</span>' +
+                logicPill + stopPill +
+              '</div>' +
+              '<div class="rule-item-actions-bar">' +
+                '<button type="button" class="btn btn-outline" style="padding:0.22rem 0.55rem;font-size:0.74rem;" data-rule-name="' + escHtml(r.name) + '" data-rule-title="' + escHtml(r.title) + '" onclick="openRuleDryRunModal(this.dataset.ruleName, this.dataset.ruleTitle)">Test (Dry Run)</button>' +
+                '<label class="switch-toggle" title="Toggle rule active">' +
+                  '<input type="checkbox" data-rule-name="' + escHtml(r.name) + '" data-group-name="' + escHtml(g.name) + '"' + (isAct ? ' checked' : '') + disAttr + ' onchange="handleToggleAutomationRule(this)">' +
+                  '<span class="switch-slider"></span>' +
+                '</label>' +
+              '</div>' +
+            '</div>' +
+            (trigsHtml ? '<div class="rule-chips-row"><span class="rule-chip-prefix">If</span>' + trigsHtml + '</div>' : '') +
+            (actsHtml ? '<div class="rule-chips-row"><span class="rule-chip-prefix">Then</span>' + actsHtml + '</div>' : '') +
+          '</div>';
+        }).join('') : '<div style="color:var(--text-muted);font-size:0.82rem;">No rules in this group.</div>';
+
+        return '<div class="rule-group-card" data-group-name="' + escHtml(g.name) + '" data-expanded="' + (isExp ? 'true' : 'false') + '">' +
+          '<div class="rule-group-header" data-group-name="' + escHtml(g.name) + '" onclick="toggleRuleGroupCard(this.dataset.groupName)">' +
+            '<div class="rule-group-left">' +
+              '<span class="rule-group-chevron">&#9656;</span>' +
+              '<span class="rule-group-title">' + escHtml(g.title) + '</span>' +
+              '<span class="bs-count-badge">' + activeInGrp + ' / ' + allRules.length + '</span>' +
+            '</div>' +
+            '<label class="switch-toggle" title="Toggle group active" onclick="event.stopPropagation()">' +
+              '<input type="checkbox" data-group-name="' + escHtml(g.name) + '"' + (Number(g.is_active) === 1 ? ' checked' : '') + disAttr + ' onchange="handleToggleRuleGroup(this)">' +
+              '<span class="switch-slider"></span>' +
+            '</label>' +
+          '</div>' +
+          '<div class="rule-group-body">' + rulesHtml + '</div>' +
+        '</div>';
+      }).join('');
+
+      box.innerHTML = renderedGroups ? html : '<div style="color:var(--text-muted);font-size:0.85rem;">No rules matching "' + escHtml(q) + '".</div>';
+      syncRulesToggleAllLabel();
+    }
+
+    function filterAutomationRules() {
+      renderAutomationRules();
+    }
+
+    function syncRulesToggleAllLabel() {
+      const btn = document.getElementById('rules-toggle-all-btn');
+      if (!btn || !rulesGroupsCache.length) return;
+      const allExpanded = rulesGroupsCache.every(g => expandedRuleGroups.has(g.name));
+      btn.textContent = allExpanded ? 'Collapse All' : 'Expand All';
+    }
+
+    function toggleRuleGroupCard(groupName) {
+      if (!groupName) return;
+      if (expandedRuleGroups.has(groupName)) expandedRuleGroups.delete(groupName);
+      else expandedRuleGroups.add(groupName);
+      renderAutomationRules();
+    }
+
+    function toggleAllRuleGroups() {
+      const allExpanded = rulesGroupsCache.length && rulesGroupsCache.every(g => expandedRuleGroups.has(g.name));
+      expandedRuleGroups.clear();
+      if (!allExpanded) {
+        rulesGroupsCache.forEach(g => expandedRuleGroups.add(g.name));
+      }
+      renderAutomationRules();
+    }
+
+    async function handleToggleAutomationRule(checkboxEl) {
+      const ruleName = checkboxEl.dataset.ruleName;
+      const groupName = checkboxEl.dataset.groupName;
+      const nextVal = checkboxEl.checked ? 1 : 0;
+
+      const grp = rulesGroupsCache.find(g => g.name === groupName);
+      const ruleObj = grp && (grp.rules || []).find(r => r.name === ruleName);
+      if (ruleObj) ruleObj.is_active = nextVal;
+      renderAutomationRules();
+
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.toggle_automation_rule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify({ rule_name: ruleName, is_active: nextVal })
+        });
+        const json = await res.json();
+        if (!res.ok || json.exc || !json.message || !json.message.ok) {
+          throw new Error('Toggle failed');
+        }
+        showToast((nextVal ? 'Enabled' : 'Disabled') + ' rule', 'success');
+      } catch (e) {
+        if (ruleObj) ruleObj.is_active = nextVal ? 0 : 1;
+        renderAutomationRules();
+        showToast('Failed to update rule', 'error');
+      }
+    }
+
+    async function handleToggleRuleGroup(checkboxEl) {
+      const groupName = checkboxEl.dataset.groupName;
+      const nextVal = checkboxEl.checked ? 1 : 0;
+      const grp = rulesGroupsCache.find(g => g.name === groupName);
+      if (grp) grp.is_active = nextVal;
+      renderAutomationRules();
+
+      try {
+        const res = await fetch('/api/method/family_erp.api.portal.toggle_rule_group', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': PORTAL_CSRF_TOKEN },
+          credentials: 'same-origin',
+          body: JSON.stringify({ group_name: groupName, is_active: nextVal })
+        });
+        const json = await res.json();
+        if (!res.ok || json.exc || !json.message || !json.message.ok) {
+          throw new Error('Toggle group failed');
+        }
+        showToast((nextVal ? 'Enabled' : 'Disabled') + ' group', 'success');
+      } catch (e) {
+        if (grp) grp.is_active = nextVal ? 0 : 1;
+        renderAutomationRules();
+        showToast('Failed to update group', 'error');
+      }
+    }
+
+    function closeRuleDryRunModal() {
+      const m = document.getElementById('rule-dryrun-modal');
+      if (m) m.classList.remove('open');
+    }
+
+    async function openRuleDryRunModal(ruleName, ruleTitle) {
+      const modal = document.getElementById('rule-dryrun-modal');
+      const titleEl = document.getElementById('dryrun-modal-title');
+      const subEl = document.getElementById('dryrun-modal-subtitle');
+      const bodyEl = document.getElementById('dryrun-modal-body');
+      if (!modal || !bodyEl) return;
+
+      if (titleEl) titleEl.textContent = 'Dry-Run: ' + (ruleTitle || ruleName);
+      if (subEl) subEl.textContent = 'Testing against last 25 transactions...';
+      bodyEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:1rem 0;">Evaluating rule against recent entries...</div>';
+      modal.classList.add('open');
+
+      try {
+        const res = await fetch(apiUrl('test_automation_rule', { rule_name: ruleName, limit: 25 }), { credentials: 'same-origin' });
+        const json = await res.json();
+        const data = json.message;
+        if (!data) {
+          if (subEl) subEl.textContent = 'Evaluation failed';
+          bodyEl.innerHTML = '<div style="color:var(--danger-text);font-size:0.85rem;">Could not run dry-run test.</div>';
+          return;
+        }
+        if (subEl) subEl.textContent = 'Matched ' + data.matched_count + ' of ' + data.tested_count + ' recent transactions';
+        const matches = data.matches || [];
+        if (!matches.length) {
+          bodyEl.innerHTML = '<div style="text-align:center;padding:1.6rem 0.75rem;color:var(--text-muted);font-size:0.88rem;border:1px dashed var(--border-color);border-radius:10px;">No recent transactions matched this rule (tested ' + data.tested_count + ' entries).</div>';
+          return;
+        }
+
+        bodyEl.innerHTML = matches.map(m => {
+          const acts = m.preview_actions || m.previewed_actions || [];
+          const chips = acts.map(a => {
+            const fmt = _formatActionChip(a);
+            return '<span class="rule-chip ' + fmt.cls + '">' + escHtml(fmt.text) + '</span>';
+          }).join('');
+          const acctLine = escHtml(m.source_account || m.from_account || '-') + ' &rarr; ' + escHtml(m.destination_account || m.to_account || '-');
+          return '<div class="dryrun-row">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.25rem;">' +
+              '<span style="font-size:0.78rem;color:var(--text-muted);font-weight:600;">' + escHtml(fmtDate(m.posting_date)) + ' &bull; ' + escHtml(m.voucher || m.name) + '</span>' +
+              '<strong style="font-variant-numeric:tabular-nums;font-size:0.9rem;">' + escHtml(fmtInr(m.amount)) + '</strong>' +
+            '</div>' +
+            '<div style="font-size:0.84rem;font-weight:600;overflow-wrap:anywhere;">' + escHtml(m.description || '(No description)') + '</div>' +
+            '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.15rem;overflow-wrap:anywhere;">Current: ' + acctLine + '</div>' +
+            (chips ? '<div class="rule-chips-row" style="margin-top:0.4rem;"><span class="rule-chip-prefix">Would Apply</span>' + chips + '</div>' : '') +
+          '</div>';
+        }).join('');
+      } catch (e) {
+        console.error('Dry-run error', e);
+        if (subEl) subEl.textContent = 'Error running evaluation';
+        bodyEl.innerHTML = '<div style="color:var(--danger-text);font-size:0.85rem;">Error running dry-run evaluation.</div>';
+      }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {

@@ -1750,7 +1750,122 @@ def save_preferences(quick_amounts=None, default_from_account=None, pinned_accou
 
 
 @frappe.whitelist()
-def test_automation_rule(rule_name, limit=20):
+def get_automation_rules():
+	"""
+	Returns all Family Rule Groups (ordered by sort_order ASC, title ASC) with their nested
+	Family Automation Rules (ordered by sort_order ASC, title ASC), triggers, and actions.
+	"""
+	_company, can_write = _resolve_portal_company()
+
+	groups = frappe.get_all(
+		"Family Rule Group",
+		fields=["name", "title", "sort_order", "is_active", "description"],
+		order_by="sort_order asc, title asc",
+	)
+	rules = frappe.get_all(
+		"Family Automation Rule",
+		fields=["name", "title", "rule_group", "sort_order", "is_active", "match_all", "stop_processing"],
+		order_by="sort_order asc, title asc",
+	)
+
+	rule_names = [r.name for r in rules]
+	trig_by_rule = {}
+	act_by_rule = {}
+	if rule_names:
+		for t in frappe.get_all(
+			"Family Rule Trigger",
+			filters={"parenttype": "Family Automation Rule", "parent": ["in", rule_names]},
+			fields=["parent", "trigger_type", "trigger_value", "negated"],
+			order_by="idx asc",
+		):
+			trig_by_rule.setdefault(t.parent, []).append(
+				{
+					"trigger_type": t.trigger_type or "",
+					"trigger_value": t.trigger_value or "",
+					"negated": cint(t.negated),
+				}
+			)
+		for a in frappe.get_all(
+			"Family Rule Action",
+			filters={"parenttype": "Family Automation Rule", "parent": ["in", rule_names]},
+			fields=["parent", "action_type", "action_value"],
+			order_by="idx asc",
+		):
+			act_by_rule.setdefault(a.parent, []).append(
+				{
+					"action_type": a.action_type or "",
+					"action_value": a.action_value or "",
+				}
+			)
+
+	rules_by_group = {}
+	for r in rules:
+		rules_by_group.setdefault(r.rule_group, []).append(
+			{
+				"name": r.name,
+				"title": r.title or "",
+				"sort_order": cint(r.sort_order),
+				"is_active": cint(r.is_active),
+				"match_all": cint(r.match_all),
+				"stop_processing": cint(r.stop_processing),
+				"triggers": trig_by_rule.get(r.name, []),
+				"actions": act_by_rule.get(r.name, []),
+			}
+		)
+
+	groups_out = []
+	for g in groups:
+		grules = rules_by_group.get(g.name, [])
+		groups_out.append(
+			{
+				"name": g.name,
+				"title": g.title or g.name,
+				"sort_order": cint(g.sort_order),
+				"is_active": cint(g.is_active),
+				"description": g.description or "",
+				"active_count": sum(1 for r in grules if r["is_active"] == 1),
+				"total_count": len(grules),
+				"rules": grules,
+			}
+		)
+
+	return {
+		"groups": groups_out,
+		"total_rules": len(rules),
+		"active_rules": sum(1 for r in rules if cint(r.is_active) == 1),
+		"can_write": can_write,
+	}
+
+
+def _toggle_rule_doc(doctype, docname, is_active):
+	_company, can_write = _resolve_portal_company()
+	if not can_write:
+		frappe.throw(_("You do not have write permission to modify automation rules."), frappe.PermissionError)
+	if not docname or not frappe.db.exists(doctype, docname):
+		frappe.throw(_("{0} '{1}' does not exist.").format(doctype, docname), frappe.DoesNotExistError)
+
+	doc = frappe.get_doc(doctype, docname)
+	doc.is_active = 1 if cint(is_active) else 0
+	doc.flags.ignore_permissions = True
+	doc.save()
+	frappe.db.commit()
+	return {"ok": True, "name": doc.name, "is_active": cint(doc.is_active)}
+
+
+@frappe.whitelist(methods=["POST"])
+def toggle_automation_rule(rule_name, is_active):
+	"""Enables or disables a Family Automation Rule and clears the rules cache."""
+	return _toggle_rule_doc("Family Automation Rule", rule_name, is_active)
+
+
+@frappe.whitelist(methods=["POST"])
+def toggle_rule_group(group_name, is_active):
+	"""Enables or disables a Family Rule Group and clears the rules cache."""
+	return _toggle_rule_doc("Family Rule Group", group_name, is_active)
+
+
+@frappe.whitelist()
+def test_automation_rule(rule_name, limit=25):
 	"""
 	Dry-run evaluates a Family Automation Rule against recent submitted Journal Entry records
 	(capped at today()) without modifying any ledger entries.
@@ -1762,7 +1877,7 @@ def test_automation_rule(rule_name, limit=20):
 	rule_doc = frappe.get_doc("Family Automation Rule", rule_name)
 	rule_dict = serialize_rule_doc(rule_doc)
 
-	limit = min(max(cint(limit) or 20, 1), 100)
+	limit = min(max(cint(limit) or 25, 1), 100)
 	je_rows = frappe.db.sql(
 		"""
 		SELECT je.name, je.posting_date, je.user_remark, je.remark, je._user_tags
@@ -1792,16 +1907,21 @@ def test_automation_rule(rule_name, limit=20):
 		}
 		res = evaluate_rules(tx_payload, company=company, rules=[rule_dict])
 		if res["matched_rules"]:
+			acts = res["matched_rules"][0]["actions"]
 			matches.append(
 				{
 					"name": item.get("name"),
+					"voucher": item.get("name"),
 					"posting_date": item.get("posting_date"),
 					"tx_type": item.get("tx_type"),
 					"amount": item.get("amount"),
-					"from_account": item.get("from_account"),
-					"to_account": item.get("to_account"),
-					"description": item.get("description"),
-					"previewed_actions": res["matched_rules"][0]["actions"],
+					"source_account": item.get("from_account") or "",
+					"destination_account": item.get("to_account") or "",
+					"from_account": item.get("from_account") or "",
+					"to_account": item.get("to_account") or "",
+					"description": item.get("description") or "",
+					"preview_actions": acts,
+					"previewed_actions": acts,
 					"previewed_payload": res["payload"],
 					"skipped": res["skipped"],
 				}
