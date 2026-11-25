@@ -443,25 +443,9 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 		as_dict=True,
 	)
 
-	def _build_cat_list(rows_subset):
-		total = sum(flt(r.amount) for r in rows_subset)
-		out = []
-		for r in rows_subset:
-			amt = flt(r.amount, 2)
-			raw_label = (r.get("account_name") or r.get("account") or "").strip()
-			if abbr_suffix and raw_label.endswith(abbr_suffix):
-				raw_label = raw_label[: -len(abbr_suffix)].strip()
-			out.append({
-				"account": r.account,
-				"label": raw_label,
-				"amount": amt,
-				"pct": round((amt / total) * 100, 1) if total > 0 else 0.0,
-			})
-		out.sort(key=lambda x: (-x["amount"], x["label"]))
-		return out
-
-	income_categories = _build_cat_list([r for r in cat_rows if r.root_type == "Income"])
-	expense_categories = _build_cat_list([r for r in cat_rows if r.root_type == "Expense"])
+	income_categories = _format_category_rows([r for r in cat_rows if r.root_type == "Income"], abbr_suffix)
+	expense_categories = _format_category_rows([r for r in cat_rows if r.root_type == "Expense"], abbr_suffix)
+	monthly_categories = _compute_monthly_categories(company, today_str, abbr_suffix)
 
 	# 6. Portal Tag metadata, To-Do transactions, and period tag_totals
 	portal_tags = frappe.get_all(
@@ -547,6 +531,7 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 		"top_categories": top_categories,
 		"income_categories": income_categories,
 		"expense_categories": expense_categories,
+		"monthly_categories": monthly_categories,
 		"todo_transactions": todo_transactions,
 		"tag_totals": tag_totals,
 		"budgets": budgets,
@@ -1325,6 +1310,84 @@ def _compute_monthly_trend(company, today_str):
 			"surplus": surplus,
 		})
 	return trend
+
+
+def _format_category_rows(rows_subset, abbr_suffix=""):
+	total = sum(flt(r.amount) for r in rows_subset if flt(r.amount) > 0)
+	out = []
+	for r in rows_subset:
+		amt = flt(r.amount, 2)
+		if amt <= 0:
+			continue
+		raw_label = (r.get("account_name") or r.get("account") or "").strip()
+		if abbr_suffix and raw_label.endswith(abbr_suffix):
+			raw_label = raw_label[: -len(abbr_suffix)].strip()
+		out.append({
+			"account": r.account,
+			"label": raw_label,
+			"amount": amt,
+			"pct": round((amt / total) * 100, 1) if total > 0 else 0.0,
+		})
+	out.sort(key=lambda x: (-x["amount"], x["label"]))
+	return out
+
+
+def _compute_monthly_categories(company, today_str, abbr_suffix=""):
+	'''Computes 12-month Income & Expenditure category breakdowns ending in today_str's month.'''
+	today_d = getdate(today_str)
+	end_year, end_month = today_d.year, today_d.month
+
+	months_12 = []
+	for back in range(11, -1, -1):
+		total_m = (end_year * 12 + (end_month - 1)) - back
+		y, m0 = divmod(total_m, 12)
+		months_12.append(f"{y:04d}-{m0 + 1:02d}")
+
+	trend_start = f"{months_12[0]}-01"
+	rows = frappe.db.sql(
+		'''
+		SELECT
+			DATE_FORMAT(gle.posting_date, '%%Y-%%m') AS ym,
+			acc.root_type,
+			gle.account AS account,
+			acc.account_name,
+			ROUND(
+				SUM(
+					CASE
+						WHEN acc.root_type = 'Income' THEN gle.credit - gle.debit
+						ELSE gle.debit - gle.credit
+					END
+				),
+				2
+			) AS amount
+		FROM `tabGL Entry` gle
+		INNER JOIN `tabAccount` acc ON gle.account = acc.name
+		WHERE gle.company = %(company)s
+			AND gle.is_cancelled = 0
+			AND acc.root_type IN ('Income', 'Expense')
+			AND gle.posting_date BETWEEN %(trend_start)s AND %(today)s
+		GROUP BY DATE_FORMAT(gle.posting_date, '%%Y-%%m'), acc.root_type, gle.account, acc.account_name
+		HAVING amount > 0
+		ORDER BY ym ASC, acc.root_type ASC, amount DESC, acc.account_name ASC
+		''',
+		{"company": company, "trend_start": trend_start, "today": today_str},
+		as_dict=True,
+	)
+
+	grouped = {ym: {"Income": [], "Expense": []} for ym in months_12}
+	for r in rows:
+		ym = r.get("ym")
+		rt = r.get("root_type")
+		if ym in grouped and rt in ("Income", "Expense"):
+			grouped[ym][rt].append(r)
+
+	monthly_categories = {}
+	for ym in months_12:
+		monthly_categories[ym] = {
+			"income": _format_category_rows(grouped[ym]["Income"], abbr_suffix),
+			"expense": _format_category_rows(grouped[ym]["Expense"], abbr_suffix),
+		}
+	return monthly_categories
 
 
 def _resolve_month_and_fy(month=None):

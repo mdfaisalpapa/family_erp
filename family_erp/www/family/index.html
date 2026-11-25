@@ -1628,6 +1628,33 @@
     }
 
     /* Interactive Income & Expenditure Category Pie Charts */
+    .pie-period-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+    .pie-period-badge {
+      display: inline-flex;
+      align-items: center;
+      background: #eff6ff;
+      color: var(--primary);
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      padding: 0.2rem 0.65rem;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+    .pie-all-btn {
+      padding: 0.2rem 0.6rem;
+      font-size: 0.74rem;
+      border-radius: 999px;
+    }
+    .pie-all-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
     .ie-pie-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1945,6 +1972,32 @@
         </div>
         <div class="trend-hint">Tap any bar or figure to filter that month&rsquo;s transactions</div>
       </div>
+
+      <div class="panel-card" id="tx-pie-charts-card" style="margin-bottom: 1.15rem;">
+        <div class="panel-header" style="flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;">
+            <h3 class="panel-title">Category Breakdown (Income &amp; Expenditure)</h3>
+            <span class="pie-period-badge" id="tx-pie-period-badge">-</span>
+            <button type="button" class="btn btn-outline pie-all-btn" id="tx-pie-all-btn" data-reset-period="all" onclick="resetPiePeriodToAll()">All Period</button>
+          </div>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Tap a slice or category to filter</span>
+        </div>
+        <div class="ie-pie-grid">
+          <div class="ie-pie-col">
+            <h4 class="ie-pie-subtitle" style="color: var(--success-text);">Income by Category</h4>
+            <div id="tx-income-pie">
+              <div style="color: var(--text-muted); font-size: 0.84rem;">Loading income breakdown...</div>
+            </div>
+          </div>
+          <div class="ie-pie-col">
+            <h4 class="ie-pie-subtitle" style="color: var(--danger-text);">Expenditure by Category</h4>
+            <div id="tx-expense-pie">
+              <div style="color: var(--text-muted); font-size: 0.84rem;">Loading expenditure breakdown...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {% if can_write %}
       <div class="tpl-bar" id="tx-template-bar"></div>
       {% endif %}
@@ -2301,8 +2354,12 @@
       </div>
 
       <div class="panel-card" id="ie-pie-charts-card" style="margin-bottom: 1.15rem;">
-        <div class="panel-header" style="flex-wrap: wrap;">
-          <h3 class="panel-title">Category Breakdown (Income &amp; Expenditure)</h3>
+        <div class="panel-header" style="flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;">
+            <h3 class="panel-title">Category Breakdown (Income &amp; Expenditure)</h3>
+            <span class="pie-period-badge" id="ie-pie-period-badge">-</span>
+            <button type="button" class="btn btn-outline pie-all-btn" id="ie-pie-all-btn" data-reset-period="all" onclick="resetPiePeriodToAll()">All Period</button>
+          </div>
           <span style="font-size: 0.75rem; color: var(--text-muted);">Tap a slice or category to view transactions</span>
         </div>
         <div class="ie-pie-grid">
@@ -2859,6 +2916,10 @@
 
     let dashAccountsCache = [];
     let monthlyTrendCache = [];
+    let monthlyCategoriesCache = {};
+    let overallIncomeCats = [];
+    let overallExpenseCats = [];
+    let activePieMonth = '';
     let selectedTrendIdx = -1;
     let formOptionsCache = null;
     let txOffset = 0;
@@ -3101,8 +3162,13 @@
         surpEl.textContent = fmtInr(s.net_surplus);
         surpEl.className = 'kpi-value ' + (s.net_surplus >= 0 ? 'pos' : 'neg');
 
+        monthlyCategoriesCache = data.monthly_categories || {};
+        overallIncomeCats = data.income_categories || [];
+        overallExpenseCats = data.expense_categories || [];
         renderMonthlyTrend(data.monthly_trend || []);
-        renderIeCategoryPies(data.income_categories || [], data.expense_categories || []);
+        if (!monthlyTrendCache.length) {
+          renderIeCategoryPies(overallIncomeCats, overallExpenseCats, 'All Period', '');
+        }
         renderWeeklyBars(data.weekly_expenses || []);
         renderCalendar(month, data.calendar_days || []);
         renderTopCategories(data.top_categories || []);
@@ -3158,6 +3224,9 @@
         if (parseInt(g.getAttribute('data-idx'), 10) === idx) g.classList.add('selected');
         else g.classList.remove('selected');
       });
+
+      const mc = monthlyCategoriesCache[item.month] || { income: [], expense: [] };
+      renderIeCategoryPies(mc.income || [], mc.expense || [], item.label, item.month);
     }
 
     function clearTxDates() {
@@ -3170,6 +3239,10 @@
 
     function drillDownMonthTransactions(monthStr, txType) {
       if (!monthStr || !/^\d{4}-\d{2}$/.test(monthStr)) return;
+      const matchIdx = monthlyTrendCache.findIndex(m => m.month === monthStr);
+      if (matchIdx >= 0) {
+        selectTrendMonth(String(matchIdx));
+      }
       const parts = monthStr.split('-').map(Number);
       const year = parts[0], month = parts[1];
       const fromDate = monthStr + '-01';
@@ -3313,7 +3386,7 @@
     const IE_INC_COLORS = ['#059669', '#0d9488', '#0284c7', '#2563eb', '#16a34a', '#0891b2', '#4f46e5', '#64748b'];
     const IE_EXP_COLORS = ['#e11d48', '#d97706', '#2563eb', '#7c3aed', '#0d9488', '#ea580c', '#db2777', '#64748b'];
 
-    function _renderSinglePie(containerId, items, txType, palette) {
+    function _renderSinglePie(containerId, items, txType, palette, activeMonth) {
       const el = document.getElementById(containerId);
       if (!el) return;
       if (!items || !items.length) {
@@ -3353,8 +3426,8 @@
         const midR = (R + r) / 2;
         const sw = R - r;
         svgShapes = '<circle class="pie-slice-btn" cx="' + cx + '" cy="' + cy + '" r="' + midR.toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="' + sw.toFixed(1) + '" ' +
-          'data-account="' + escHtml(s.account) + '" data-label="' + escHtml(s.label) + '" data-tx-type="' + escHtml(txType) + '" ' +
-          'onclick="drillDownCategoryTransactions(this.dataset.account, this.dataset.label, this.dataset.txType)">' +
+          'data-account="' + escHtml(s.account) + '" data-label="' + escHtml(s.label) + '" data-tx-type="' + escHtml(txType) + '" data-month="' + escHtml(activeMonth || '') + '" ' +
+          'onclick="drillDownCategoryTransactions(this.dataset.account, this.dataset.label, this.dataset.txType, this.dataset.month)">' +
           '<title>' + escHtml(s.label + ': ' + fmtInr(s.amount) + ' (' + s.pct + '%)') + '</title></circle>';
       } else {
         slices.forEach((s, idx) => {
@@ -3381,10 +3454,10 @@
           const col = palette[idx % palette.length];
           const clickAttr = s.is_others
             ? ''
-            : ' onclick="drillDownCategoryTransactions(this.dataset.account, this.dataset.label, this.dataset.txType)"';
+            : ' onclick="drillDownCategoryTransactions(this.dataset.account, this.dataset.label, this.dataset.txType, this.dataset.month)"';
           const cls = s.is_others ? '' : 'pie-slice-btn';
           svgShapes += '<path class="' + cls + '" d="' + d + '" fill="' + col + '" stroke="#ffffff" stroke-width="1.5" ' +
-            'data-account="' + escHtml(s.account || '') + '" data-label="' + escHtml(s.label) + '" data-tx-type="' + escHtml(txType) + '"' + clickAttr + '>' +
+            'data-account="' + escHtml(s.account || '') + '" data-label="' + escHtml(s.label) + '" data-tx-type="' + escHtml(txType) + '" data-month="' + escHtml(activeMonth || '') + '"' + clickAttr + '>' +
             '<title>' + escHtml(s.label + ': ' + fmtInr(s.amount) + ' (' + s.pct + '%)') + '</title></path>';
         });
       }
@@ -3404,8 +3477,8 @@
             '<span class="ie-pie-amt">' + escHtml(fmtInr(s.amount)) + ' (' + s.pct + '%)</span>' +
           '</div>';
         }
-        return '<button type="button" class="ie-pie-legend-item" data-account="' + escHtml(s.account) + '" data-label="' + escHtml(s.label) + '" data-tx-type="' + escHtml(txType) + '" ' +
-          'onclick="drillDownCategoryTransactions(this.dataset.account, this.dataset.label, this.dataset.txType)">' +
+        return '<button type="button" class="ie-pie-legend-item" data-account="' + escHtml(s.account) + '" data-label="' + escHtml(s.label) + '" data-tx-type="' + escHtml(txType) + '" data-month="' + escHtml(activeMonth || '') + '" ' +
+          'onclick="drillDownCategoryTransactions(this.dataset.account, this.dataset.label, this.dataset.txType, this.dataset.month)">' +
           '<span class="ie-pie-lbl"><span class="trend-dot" style="background:' + col + ';flex-shrink:0;"></span><span class="ie-pie-lbl-text">' + escHtml(s.label) + '</span></span>' +
           '<span class="ie-pie-amt">' + escHtml(fmtInr(s.amount)) + ' (' + s.pct + '%)</span>' +
         '</button>';
@@ -3414,9 +3487,30 @@
       el.innerHTML = '<div class="ie-pie-wrap">' + svgHtml + legendHtml + '</div>';
     }
 
-    function renderIeCategoryPies(incomeCats, expenseCats) {
-      _renderSinglePie('ie-income-pie', incomeCats, 'Income', IE_INC_COLORS);
-      _renderSinglePie('ie-expense-pie', expenseCats, 'Expense', IE_EXP_COLORS);
+    function renderIeCategoryPies(incomeCats, expenseCats, periodLabel, activeMonth) {
+      activePieMonth = activeMonth || '';
+      const displayPeriod = periodLabel || 'All Period';
+      ['ie-pie-period-badge', 'tx-pie-period-badge'].forEach(id => {
+        const badge = document.getElementById(id);
+        if (badge) badge.textContent = displayPeriod;
+      });
+      ['ie-pie-all-btn', 'tx-pie-all-btn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          if (!activePieMonth) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+
+      _renderSinglePie('ie-income-pie', incomeCats, 'Income', IE_INC_COLORS, activePieMonth);
+      _renderSinglePie('tx-income-pie', incomeCats, 'Income', IE_INC_COLORS, activePieMonth);
+      _renderSinglePie('ie-expense-pie', expenseCats, 'Expense', IE_EXP_COLORS, activePieMonth);
+      _renderSinglePie('tx-expense-pie', expenseCats, 'Expense', IE_EXP_COLORS, activePieMonth);
+    }
+
+    function resetPiePeriodToAll() {
+      activePieMonth = '';
+      renderIeCategoryPies(overallIncomeCats, overallExpenseCats, 'All Period', '');
     }
 
     function renderTxActiveFilters() {
@@ -3439,7 +3533,7 @@
       loadTransactions(false);
     }
 
-    function drillDownCategoryTransactions(accountName, label, txType) {
+    function drillDownCategoryTransactions(accountName, label, txType, monthStr) {
       if (!accountName) return;
       txAccountFilter = accountName;
       txAccountLabel = label || accountName;
@@ -3447,8 +3541,18 @@
 
       const fromEl = document.getElementById('tx-from-date');
       const toEl = document.getElementById('tx-to-date');
-      if (fromEl) fromEl.value = (PORTAL_FROM_DATE && PORTAL_FROM_DATE !== '2022-04-01') ? PORTAL_FROM_DATE : '';
-      if (toEl) toEl.value = '';
+      if (monthStr && /^\d{4}-\d{2}$/.test(monthStr)) {
+        const parts = monthStr.split('-').map(Number);
+        const lastDay = new Date(parts[0], parts[1], 0).getDate();
+        const monthEnd = monthStr + '-' + String(lastDay).padStart(2, '0');
+        const now = new Date();
+        const todayLocal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        if (fromEl) fromEl.value = monthStr + '-01';
+        if (toEl) toEl.value = monthEnd > todayLocal ? todayLocal : monthEnd;
+      } else {
+        if (fromEl) fromEl.value = '';
+        if (toEl) toEl.value = '';
+      }
 
       showTab('transactions');
       document.querySelectorAll('#tx-type-pills .pill-btn').forEach(b => {
