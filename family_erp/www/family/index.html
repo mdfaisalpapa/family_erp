@@ -1292,6 +1292,270 @@
     .ie-group-child td:first-child {
       padding-left: 2.15rem;
     }
+
+    /* Global Overflow Guard & Report Mobile Responsiveness (down to 360px) */
+    html, body {
+      max-width: 100%;
+      overflow-x: clip;
+    }
+    .container {
+      box-sizing: border-box;
+      overflow-x: clip;
+    }
+    .report-grid > *,
+    .home-grid > *,
+    .dash-grid > *,
+    .properties-grid > *,
+    .panel-card,
+    .balance-card,
+    .table-container,
+    .property-card {
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    .sub-tabs-bar,
+    .sub-pill-group {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Balance Sheet & Income & Expenditure fixed table layout so long names wrap cleanly */
+    #tab-balance-sheet .statement-table,
+    #tab-income-expense .statement-table {
+      width: 100%;
+      table-layout: fixed;
+    }
+    #tab-balance-sheet .statement-table th:first-child,
+    #tab-balance-sheet .statement-table td:first-child,
+    #tab-income-expense .statement-table th:first-child,
+    #tab-income-expense .statement-table td:first-child {
+      width: auto;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    #tab-balance-sheet .statement-table th.num,
+    #tab-balance-sheet .statement-table td.num,
+    #tab-income-expense .statement-table th.num,
+    #tab-income-expense .statement-table td.num {
+      width: 135px;
+      white-space: nowrap;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 0.85rem 0.75rem;
+      }
+      .top-bar {
+        padding: 0.55rem 0.85rem;
+      }
+      .tab-btn {
+        padding: 0.55rem 0.65rem;
+        font-size: 0.84rem;
+      }
+      .sub-pill-group {
+        width: 100%;
+      }
+      .sub-pill {
+        flex: 1 1 auto;
+        text-align: center;
+        padding: 0.4rem 0.55rem;
+        font-size: 0.8rem;
+      }
+      .report-grid,
+      .properties-grid,
+      .dash-grid {
+        grid-template-columns: 1fr;
+        gap: 0.9rem;
+      }
+      .balance-card,
+      .panel-card,
+      .property-card,
+      .filter-toolbar {
+        padding: 14px;
+      }
+      .balance-info {
+        flex: 1 1 100%;
+      }
+      .balance-amount {
+        font-size: 1.65rem;
+      }
+      .stats-counters {
+        width: 100%;
+        gap: 0.5rem;
+      }
+      .counter-item {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 0.6rem 0.45rem;
+      }
+      .counter-value {
+        font-size: 1rem !important;
+      }
+      #tab-balance-sheet .statement-table th,
+      #tab-balance-sheet .statement-table td,
+      #tab-income-expense .statement-table th,
+      #tab-income-expense .statement-table td {
+        padding: 10px 8px;
+        font-size: 0.84rem;
+      }
+      #tab-balance-sheet .statement-table th.num,
+      #tab-balance-sheet .statement-table td.num,
+      #tab-income-expense .statement-table th.num,
+      #tab-income-expense .statement-table td.num {
+        width: 112px;
+        font-size: 0.82rem;
+      }
+      .bs-group-child td:first-child,
+      .ie-group-child td:first-child {
+        padding-left: 1.45rem;
+      }
+
+      /* Statement filter toolbar stacked cleanly */
+      #tab-statement .filter-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.65rem;
+      }
+      #tab-statement .quick-presets {
+        width: 100%;
+      }
+      #tab-statement .quick-presets .btn {
+        flex: 1;
+        justify-content: center;
+      }
+      #tab-statement .date-filter-form {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+      }
+      #tab-statement .date-filter-form > span {
+        display: none;
+      }
+      #tab-statement #gl_account_select,
+      #tab-statement .date-filter-form .date-input,
+      #tab-statement .date-filter-form .btn {
+        width: 100%;
+        max-width: 100% !important;
+        box-sizing: border-box;
+      }
+
+      /* Properties wrapping on narrow viewports */
+      .property-card-header,
+      .meta-item,
+      .eb-item {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+      .meta-val {
+        max-width: 100%;
+        flex-wrap: wrap;
+      }
+      .meta-val code,
+      .eb-num,
+      .eb-consumer {
+        word-break: break-all;
+        overflow-wrap: anywhere;
+        white-space: normal;
+        max-width: 100%;
+      }
+    }
+
+    /* Statement of Account: stacked ledger cards on mobile (<= 640px) */
+    @media (max-width: 640px) {
+      #tab-statement .table-container {
+        overflow-x: visible;
+      }
+      .stmt-ledger-table,
+      .stmt-ledger-table tbody,
+      .stmt-ledger-table tfoot {
+        display: block;
+        width: 100%;
+      }
+      .stmt-ledger-table thead {
+        display: none;
+      }
+      .stmt-ledger-table tbody tr:not(.stmt-empty-row) {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 12px 10px;
+        gap: 6px;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .stmt-ledger-table tbody tr:not(.stmt-empty-row):last-child {
+        border-bottom: none;
+      }
+      .stmt-ledger-table tbody td {
+        border: none;
+        padding: 0;
+      }
+      .stmt-ledger-table tbody tr.stmt-empty-row,
+      .stmt-ledger-table tbody tr.stmt-empty-row td {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .stmt-ledger-table td.stmt-date {
+        order: 1;
+        width: 100%;
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: var(--text-muted);
+      }
+      .stmt-ledger-table td.stmt-desc {
+        order: 2;
+        width: 100%;
+        font-size: 0.87rem;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        padding-bottom: 4px;
+      }
+      .stmt-ledger-table td.stmt-dr,
+      .stmt-ledger-table td.stmt-cr,
+      .stmt-ledger-table td.stmt-bal {
+        order: 3;
+        flex: 1 1 30%;
+        min-width: 0;
+        font-size: 0.8rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .stmt-ledger-table td.stmt-dr,
+      .stmt-ledger-table td.stmt-cr {
+        text-align: left !important;
+      }
+      .stmt-ledger-table td.stmt-bal {
+        text-align: right !important;
+      }
+      .stmt-ledger-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 1px;
+      }
+      .stmt-ledger-table tfoot tr.row-total {
+        display: flex;
+        flex-wrap: wrap;
+        padding: 12px 10px;
+        gap: 6px;
+      }
+      .stmt-ledger-table tfoot td {
+        border: none;
+        padding: 0;
+      }
+      .stmt-ledger-table tfoot td.stmt-total-title {
+        width: 100%;
+        font-size: 0.85rem;
+        padding-bottom: 4px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1572,7 +1836,7 @@
       {% endif %}
 
       <div class="table-container">
-        <table class="statement-table">
+        <table class="statement-table stmt-ledger-table">
           <thead>
             <tr>
               <th style="width: 120px;">Date</th>
@@ -1585,29 +1849,29 @@
           <tbody>
             {% for row in statement_rows %}
             <tr>
-              <td>{{ row.posting_date or '-' }}</td>
-              <td>
+              <td class="stmt-date">{{ row.posting_date or '-' }}</td>
+              <td class="stmt-desc">
                 <div style="font-weight: 500;">{{ row.description }}</div>
                 {% if row.voucher_no %}
                 <div style="font-size: 0.75rem; color: var(--text-muted);">{{ row.voucher_type }}: {{ row.voucher_no }}</div>
                 {% endif %}
               </td>
-              <td class="num">{{ row.debit_formatted }}</td>
-              <td class="num">{{ row.credit_formatted }}</td>
-              <td class="num" style="font-weight: 600;">{{ row.balance_formatted }}</td>
+              <td class="num stmt-dr" data-label="Settled (Dr)">{{ row.debit_formatted }}</td>
+              <td class="num stmt-cr" data-label="Billed (Cr)">{{ row.credit_formatted }}</td>
+              <td class="num stmt-bal" data-label="Balance" style="font-weight: 600;">{{ row.balance_formatted }}</td>
             </tr>
             {% else %}
-            <tr>
+            <tr class="stmt-empty-row">
               <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No transactions found for this period.</td>
             </tr>
             {% endfor %}
           </tbody>
           <tfoot>
             <tr class="row-total">
-              <td colspan="2" style="font-weight: 700;">Total for Selected Period</td>
-              <td class="num">{{ total_debit_formatted }}</td>
-              <td class="num">{{ total_credit_formatted }}</td>
-              <td class="num" style="font-size: 1.05rem;">{{ net_balance_formatted }}</td>
+              <td colspan="2" class="stmt-total-title" style="font-weight: 700;">Total for Selected Period</td>
+              <td class="num stmt-dr" data-label="Total Dr">{{ total_debit_formatted }}</td>
+              <td class="num stmt-cr" data-label="Total Cr">{{ total_credit_formatted }}</td>
+              <td class="num stmt-bal" data-label="Closing" style="font-size: 1.05rem;">{{ net_balance_formatted }}</td>
             </tr>
           </tfoot>
         </table>
@@ -1652,7 +1916,7 @@
               <thead>
                 <tr>
                   <th>Category / Account</th>
-                  <th class="num" style="width: 160px;">Balance</th>
+                  <th class="num">Balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -1694,7 +1958,7 @@
               <thead>
                 <tr>
                   <th>Category / Account</th>
-                  <th class="num" style="width: 160px;">Balance</th>
+                  <th class="num">Balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -1735,7 +1999,7 @@
               <thead>
                 <tr>
                   <th>Category / Account</th>
-                  <th class="num" style="width: 160px;">Balance</th>
+                  <th class="num">Balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -1803,7 +2067,7 @@
               <thead>
                 <tr>
                   <th>Category / Account</th>
-                  <th class="num" style="width: 160px;">Amount</th>
+                  <th class="num">Amount</th>
                 </tr>
               </thead>
               <tbody>
@@ -1845,7 +2109,7 @@
               <thead>
                 <tr>
                   <th>Category / Account</th>
-                  <th class="num" style="width: 160px;">Amount</th>
+                  <th class="num">Amount</th>
                 </tr>
               </thead>
               <tbody>
