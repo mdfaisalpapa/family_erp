@@ -410,6 +410,59 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 	for cat in top_categories:
 		cat["amount"] = flt(cat["amount"], 2)
 
+	# 5b. Full Income & Expenditure category breakdown for interactive pie charts
+	company_abbr = frappe.db.get_value("Company", company, "abbr") or ""
+	abbr_suffix = f" - {company_abbr}" if company_abbr else ""
+	cat_rows = frappe.db.sql(
+		'''
+		SELECT
+			acc.name AS account,
+			acc.account_name,
+			acc.root_type,
+			ROUND(
+				SUM(
+					CASE
+						WHEN acc.root_type = 'Income' THEN gle.credit - gle.debit
+						ELSE gle.debit - gle.credit
+					END
+				),
+				2
+			) AS amount
+		FROM `tabGL Entry` gle
+		INNER JOIN `tabAccount` acc ON gle.account = acc.name
+		WHERE gle.company = %(company)s
+			AND gle.is_cancelled = 0
+			AND acc.root_type IN ('Income', 'Expense')
+			AND gle.posting_date BETWEEN %(from_date)s AND %(to_date)s
+			AND gle.posting_date <= %(today_str)s
+		GROUP BY acc.name, acc.account_name, acc.root_type
+		HAVING amount > 0.01
+		ORDER BY amount DESC, acc.account_name ASC
+		''',
+		{"company": company, "from_date": from_date, "to_date": to_date, "today_str": today_str},
+		as_dict=True,
+	)
+
+	def _build_cat_list(rows_subset):
+		total = sum(flt(r.amount) for r in rows_subset)
+		out = []
+		for r in rows_subset:
+			amt = flt(r.amount, 2)
+			raw_label = (r.get("account_name") or r.get("account") or "").strip()
+			if abbr_suffix and raw_label.endswith(abbr_suffix):
+				raw_label = raw_label[: -len(abbr_suffix)].strip()
+			out.append({
+				"account": r.account,
+				"label": raw_label,
+				"amount": amt,
+				"pct": round((amt / total) * 100, 1) if total > 0 else 0.0,
+			})
+		out.sort(key=lambda x: (-x["amount"], x["label"]))
+		return out
+
+	income_categories = _build_cat_list([r for r in cat_rows if r.root_type == "Income"])
+	expense_categories = _build_cat_list([r for r in cat_rows if r.root_type == "Expense"])
+
 	# 6. Portal Tag metadata, To-Do transactions, and period tag_totals
 	portal_tags = frappe.get_all(
 		"Family Portal Tag",
@@ -492,6 +545,8 @@ def get_dashboard_data(from_date=None, to_date=None, month=None):
 		"monthly_trend": monthly_trend,
 		"calendar_days": calendar_days,
 		"top_categories": top_categories,
+		"income_categories": income_categories,
+		"expense_categories": expense_categories,
 		"todo_transactions": todo_transactions,
 		"tag_totals": tag_totals,
 		"budgets": budgets,

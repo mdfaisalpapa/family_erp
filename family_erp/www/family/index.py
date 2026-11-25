@@ -6,6 +6,15 @@ from family_erp.family_erp.report.family_dues_statement import family_dues_state
 no_cache = 1
 
 
+def fmt_date(val):
+	if not val:
+		return ""
+	try:
+		return getdate(val).strftime("%d %m %Y")
+	except Exception:
+		return str(val)
+
+
 def get_home_page(user):
 	"""
 	Returns '/family' for non-admin users who have a Company User Permission.
@@ -89,6 +98,8 @@ def get_context(context):
 	as_on_date = frappe.form_dict.get("as_on_date")
 	context["from_date"] = from_date
 	context["to_date"] = to_date
+	context["from_date_display"] = fmt_date(from_date)
+	context["to_date_display"] = fmt_date(to_date)
 
 	# Fetch statement data (clearing-account dues mode, or GL fallback for parent company)
 	filters = {
@@ -174,7 +185,7 @@ def _populate_dues_statement(context, raw_data, to_date):
 		row_bal = flt(row.get("balance"))
 
 		statement_rows.append({
-			"posting_date": row.get("posting_date"),
+			"posting_date": fmt_date(row.get("posting_date")),
 			"voucher_type": row.get("voucher_type"),
 			"voucher_no": row.get("voucher_no"),
 			"description": row.get("description"),
@@ -198,18 +209,19 @@ def _populate_dues_statement(context, raw_data, to_date):
 	# positive: Family member owes Faisal
 	# negative: Credit with Faisal (Faisal owes family member)
 	# zero: Settled
+	to_date_disp = fmt_date(to_date)
 	if net_balance > 0.005:
 		context["balance_status_text"] = "Net Balance Payable to Faisal"
 		context["balance_status_badge"] = "payable"
-		context["balance_subtext"] = f"As of {to_date}, you have a balance due to Faisal Household."
+		context["balance_subtext"] = f"As of {to_date_disp}, you have a balance due to Faisal Household."
 	elif net_balance < -0.005:
 		context["balance_status_text"] = "Credit with Faisal"
 		context["balance_status_badge"] = "credit"
-		context["balance_subtext"] = f"As of {to_date}, you have an advance credit with Faisal Household."
+		context["balance_subtext"] = f"As of {to_date_disp}, you have an advance credit with Faisal Household."
 	else:
 		context["balance_status_text"] = "All Dues Settled"
 		context["balance_status_badge"] = "settled"
-		context["balance_subtext"] = f"All accounts are fully settled as of {to_date}."
+		context["balance_subtext"] = f"All accounts are fully settled as of {to_date_disp}."
 
 
 def _populate_gl_statement(context, company, from_date, to_date):
@@ -361,7 +373,7 @@ def _populate_gl_statement(context, company, from_date, to_date):
 
 	if abs(start_balance) >= 0.005 or total_count > 1000:
 		statement_rows.append({
-			"posting_date": from_date,
+			"posting_date": fmt_date(from_date),
 			"voucher_type": "",
 			"voucher_no": "",
 			"description": opening_desc,
@@ -386,7 +398,7 @@ def _populate_gl_statement(context, company, from_date, to_date):
 			desc = raw_desc
 
 		statement_rows.append({
-			"posting_date": entry.posting_date,
+			"posting_date": fmt_date(entry.posting_date),
 			"voucher_type": entry.voucher_type,
 			"voucher_no": entry.voucher_no,
 			"description": desc,
@@ -406,15 +418,16 @@ def _populate_gl_statement(context, company, from_date, to_date):
 	context["net_balance_formatted"] = fmt_inr(abs(closing_balance))
 	context["balance_status_text"] = scope_label
 
+	to_date_disp = fmt_date(to_date)
 	if closing_balance > 0.005:
 		context["balance_status_badge"] = "credit"
-		context["balance_subtext"] = f"{scope_label} as of {to_date} (Debit / Net Positive Balance)."
+		context["balance_subtext"] = f"{scope_label} as of {to_date_disp} (Debit / Net Positive Balance)."
 	elif closing_balance < -0.005:
 		context["balance_status_badge"] = "payable"
-		context["balance_subtext"] = f"{scope_label} as of {to_date} (Credit / Liability Balance)."
+		context["balance_subtext"] = f"{scope_label} as of {to_date_disp} (Credit / Liability Balance)."
 	else:
 		context["balance_status_badge"] = "settled"
-		context["balance_subtext"] = f"{scope_label} is settled (zero balance) as of {to_date}."
+		context["balance_subtext"] = f"{scope_label} is settled (zero balance) as of {to_date_disp}."
 
 
 def _set_empty_gl_context(context, scope_label, to_date):
@@ -425,7 +438,7 @@ def _set_empty_gl_context(context, scope_label, to_date):
 	context["net_balance_formatted"] = fmt_inr(0)
 	context["balance_status_text"] = scope_label
 	context["balance_status_badge"] = "settled"
-	context["balance_subtext"] = f"No transactions recorded for {scope_label} as of {to_date}."
+	context["balance_subtext"] = f"No transactions recorded for {scope_label} as of {fmt_date(to_date)}."
 
 
 def _populate_balance_sheet(context, company, as_on_date=None):
@@ -499,6 +512,7 @@ def _populate_balance_sheet(context, company, as_on_date=None):
 	context["bs_total_liabilities_formatted"] = fmt_inr(total_liabilities)
 	context["bs_total_equity_formatted"] = fmt_inr(total_equity)
 	context["bs_net_worth_formatted"] = fmt_inr(net_worth)
+	context["bs_as_on_display"] = fmt_date(effective_as_on)
 
 
 def _populate_income_expenditure(context, company, from_date, to_date, explicit_to=False):
@@ -564,6 +578,8 @@ def _populate_income_expenditure(context, company, from_date, to_date, explicit_
 	context["ie_total_income_formatted"] = fmt_inr(total_income)
 	context["ie_total_expense_formatted"] = fmt_inr(total_expense)
 	context["ie_net_surplus_formatted"] = fmt_inr(net_surplus)
+	context["ie_from_display"] = fmt_date(from_date)
+	context["ie_to_display"] = fmt_date(effective_to)
 
 
 def _group_report_items(items, company_abbr, prefix, value_key="balance"):
